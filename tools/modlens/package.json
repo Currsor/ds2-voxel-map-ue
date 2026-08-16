@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@liustack/modlens": "^3.17.0"
+  }
+}

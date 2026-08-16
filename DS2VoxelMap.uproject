@@ -1,0 +1,17 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.4",
+	"Category": "",
+	"Description": "DS2 Voxel Map - DEATH STRANDING 2 voxel 3D UI map rendering demo",
+	"Modules": [
+		{
+			"Name": "DS2VoxelMap",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit",
+			"AdditionalDependencies": [
+				"Engine"
+			]
+		}
+	],
+	"Plugins": []
+}

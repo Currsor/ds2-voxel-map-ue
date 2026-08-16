@@ -22,3 +22,19 @@ Build/
 
 # macOS
 .DS_Store
+
+# 诊断导出（RT 逐像素 CSV + 黑缝标红 PNG）
+rt_dump.csv
+rt_highlight.png
+
+# dotnet 参考实现（ref/）的编译产物
+ref/bin/
+ref/obj/
+ref/.dotnet/
+ref/.nuget/
+
+# 本地工具依赖
+tools/modlens/node_modules/
+
+# IDE
+.idea/

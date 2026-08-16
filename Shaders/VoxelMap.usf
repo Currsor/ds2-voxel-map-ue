@@ -1,0 +1,330 @@
+// DS2 Voxel Map — M4：片元着色器（ray-box + 3D DDA + 逐体素颜色 + LOD + 深度覆写）
+// 注意：全局变量名必须与 C++ 端 FParameters 成员名严格一致。
+#include "/Engine/Private/Common.ush"
+
+StructuredBuffer<uint> BlockDataBuffer; // 每 block 连续 4 个 uint32
+StructuredBuffer<uint> VoxelDataBuffer; // 每占用体素 1 个 uint32（RGB24 + extra8）
+
+float4x4 ViewProjectionMatrix;
+float3 CameraRight;
+float3 CameraUp;
+float3 CameraPos;
+float4 BlockGrid;     // (BlockCountX, BlockCountY, BlockCountZ, 0)
+float3 WorldOrigin;
+float VoxelSize;
+float2 LODDistances;  // (Level2 距离, Level1 距离)
+float4 FrustumPlanes[6];     // 视锥平面（法线朝内）
+float BillboardHalfSizeScale; // billboard 半尺寸 = BlockSize × 此值
+float bDebugDepth;            // 调试：>0.5 时输出深度灰度
+
+struct FVoxelMapVSToPS
+{
+	float4 Position : SV_POSITION;
+	float3 PixelWorldPos : TEXCOORD0;
+	float3 BlockWorldCenter : TEXCOORD1;
+	nointerpolation uint BlockIndex : TEXCOORD2;
+};
+
+// ---- 顶点着色器（M3） ----
+void MainVS(
+	float2 InCorner : ATTRIBUTE0,
+	uint InstanceID : SV_InstanceID,
+	out FVoxelMapVSToPS Output)
+{
+	uint ShapeLevelAndLocation = BlockDataBuffer[InstanceID * 4 + 0];
+	uint BlockIndex = (ShapeLevelAndLocation >> 8) & 0x00FFFFFFu;
+
+	uint BlockCountX = (uint)BlockGrid.x;
+	uint BlockCountY = (uint)BlockGrid.y;
+	uint Bx = BlockIndex % BlockCountX;
+	uint By = (BlockIndex / BlockCountX) % BlockCountY;
+	uint Bz = BlockIndex / (BlockCountX * BlockCountY);
+
+	// 体素 (x,y,z) -> 世界 (x,z,y)：体素 Y 是高度，UE 世界 Z 向上
+	float BlockSize = 4.0 * VoxelSize;
+	float3 BlockMin = WorldOrigin + float3((float)Bx, (float)Bz, (float)By) * BlockSize;
+	float3 BlockCenter = BlockMin + 0.5 * BlockSize;
+
+	Output.BlockWorldCenter = BlockCenter;
+	Output.BlockIndex = BlockIndex;
+
+	// M6：视锥剔除（block 包围球 vs 6 平面）
+	// UE 约定：平面距离 = dot(normal, P) - W，法线朝外，距离 > 半径 表示完全在外
+	float BlockRadius = BlockSize * 0.8660254; // sqrt(3)/2
+	bool bCulled = false;
+	for (int i = 0; i < 6; i++)
+	{
+		if (dot(FrustumPlanes[i].xyz, BlockCenter) - FrustumPlanes[i].w > BlockRadius)
+		{
+			bCulled = true;
+			break;
+		}
+	}
+	if (bCulled)
+	{
+		Output.Position = float4(0.0, 0.0, 1.0, 1.0); // 退化 quad
+		Output.PixelWorldPos = float3(0.0, 0.0, 0.0);
+		Output.BlockWorldCenter = float3(0.0, 0.0, 0.0);
+		Output.BlockIndex = 0;
+		return;
+	}
+
+	// billboard：沿相机 Right/Up 展开 unit quad
+	// 距离自适应：far block ≈ 包围球半径（省 overdraw），near block 加大覆盖透视放大
+	float CamDist = distance(CameraPos, BlockCenter);
+	float HalfSize = BlockRadius * CamDist / max(CamDist - BlockRadius, 0.0001);
+	HalfSize = min(HalfSize, BlockSize * 1.5) * BillboardHalfSizeScale;
+	float3 WorldPos = BlockCenter + (CameraRight * InCorner.x + CameraUp * InCorner.y) * HalfSize;
+	Output.PixelWorldPos = WorldPos;
+	Output.Position = mul(float4(WorldPos, 1.0), ViewProjectionMatrix);
+}
+
+// ---- 片元着色器（M4） ----
+float3 WorldToVoxel(float3 W)
+{
+	return float3(W.x - WorldOrigin.x, W.z - WorldOrigin.z, W.y - WorldOrigin.y) / VoxelSize;
+}
+
+float3 WorldDirToVoxelDir(float3 D)
+{
+	return float3(D.x, D.z, D.y) / VoxelSize;
+}
+
+uint TestBit64(uint Bit, uint MaskLow, uint MaskHigh)
+{
+	if (Bit < 32u) return (MaskLow >> Bit) & 1u;
+	return (MaskHigh >> (Bit - 32u)) & 1u;
+}
+
+// 统计 64-bit 掩码中 Bit 之前的占用数（用于 VoxelData 的 offset）
+uint PopCountBelow64(uint Bit, uint MaskLow, uint MaskHigh)
+{
+	if (Bit < 32u)
+	{
+		uint M = (Bit == 0u) ? 0u : ((1u << Bit) - 1u);
+		return countbits(MaskLow & M);
+	}
+	uint M = ((Bit - 32u) == 0u) ? 0u : ((1u << (Bit - 32u)) - 1u);
+	return countbits(MaskLow) + countbits(MaskHigh & M);
+}
+
+float3 DecodeColor(uint Packed)
+{
+	return float3(Packed & 0xFFu, (Packed >> 8) & 0xFFu, (Packed >> 16) & 0xFFu) / 255.0;
+}
+
+float3 VoxelNormalToWorld(int3 N)
+{
+	return normalize(float3((float)N.x, (float)N.z, (float)N.y));
+}
+
+float3 Shade(float3 BaseColor, float3 WorldNormal)
+{
+	// 更高环境光 + 偏顶向光，背光面不过暗（过暗的"深绿"容易被当成渲染 bug）
+	float3 L = normalize(float3(0.5, 0.3, 0.8));
+	float Diffuse = 0.62 + 0.38 * saturate(dot(WorldNormal, L));
+	return BaseColor * Diffuse;
+}
+
+void MainPS(FVoxelMapVSToPS Input, out float4 OutColor : SV_Target0, out float OutDepth : SV_Depth)
+{
+	uint BlockIndex = Input.BlockIndex;
+	uint4 BlockData = uint4(
+		BlockDataBuffer[BlockIndex * 4 + 0],
+		BlockDataBuffer[BlockIndex * 4 + 1],
+		BlockDataBuffer[BlockIndex * 4 + 2],
+		BlockDataBuffer[BlockIndex * 4 + 3]);
+
+	uint ShapeLevelAndLocation = BlockData.x;
+	uint MaskLow = BlockData.y;
+	uint MaskHigh = BlockData.z;
+	uint RenderStartIndex = BlockData.w;
+	uint CoarseMask = ShapeLevelAndLocation & 0xFFu;
+
+	uint BlockCountX = (uint)BlockGrid.x;
+	uint BlockCountY = (uint)BlockGrid.y;
+	uint Bx = BlockIndex % BlockCountX;
+	uint By = (BlockIndex / BlockCountX) % BlockCountY;
+	uint Bz = BlockIndex / (BlockCountX * BlockCountY);
+	float3 BlockVoxelMin = float3((float)(Bx * 4u), (float)(By * 4u), (float)(Bz * 4u));
+
+	// 射线（体素空间）
+	float3 RayDir = normalize(Input.PixelWorldPos - CameraPos);
+	float3 VoxelOrigin = WorldToVoxel(CameraPos);
+	float3 VoxelDir = WorldDirToVoxelDir(RayDir);
+
+	// ray-box 求交（4×4×4 块）— 零方向分量加极小 epsilon，避免 0×inf=NaN
+	float3 SafeVoxelDir = VoxelDir + float3(1e-8, 1e-8, 1e-8);
+	float3 InvDir = 1.0 / SafeVoxelDir;
+	float3 T0 = (BlockVoxelMin - VoxelOrigin) * InvDir;
+	float3 T1 = (BlockVoxelMin + 4.0 - VoxelOrigin) * InvDir;
+	float3 TMin = min(T0, T1);
+	float3 TMax = max(T0, T1);
+	float TEnter = max(max(TMin.x, TMin.y), TMin.z);
+	float TExit = min(min(TMax.x, TMax.y), TMax.z);
+	if (TEnter > TExit || TExit < 0.0) discard;
+	TEnter = max(TEnter, 0.0);
+
+	float Dist = distance(CameraPos, Input.BlockWorldCenter);
+	float3 HitNormal = float3(0.0, 0.0, 1.0);
+	float HitT = TEnter;
+	uint ColorIndex = RenderStartIndex;
+
+	if (Dist < LODDistances.x)
+	{
+		// Level 2：完整 4×4×4 DDA
+		float3 EntryPos = VoxelOrigin + VoxelDir * TEnter;
+		float3 LocalPos = EntryPos - BlockVoxelMin;
+		int3 Cell = clamp(int3(floor(LocalPos)), int3(0, 0, 0), int3(3, 3, 3));
+
+		float3 Step = float3(VoxelDir.x >= 0.0 ? 1.0 : -1.0, VoxelDir.y >= 0.0 ? 1.0 : -1.0, VoxelDir.z >= 0.0 ? 1.0 : -1.0);
+		float3 TDelta = abs(1.0 / VoxelDir);
+		float3 NextBoundary = float3(Cell) + (Step > 0.0 ? 1.0 : 0.0);
+		float3 TMax = (NextBoundary - LocalPos) / VoxelDir;
+
+		// 进入块的面法线（首个 cell 直接命中时用）：由 ray-box 的 TMin 最大轴决定
+		int3 EntryNormal;
+		if (TMin.x >= TMin.y && TMin.x >= TMin.z)
+			EntryNormal = int3(-(int)Step.x, 0, 0);
+		else if (TMin.y >= TMin.z)
+			EntryNormal = int3(0, -(int)Step.y, 0);
+		else
+			EntryNormal = int3(0, 0, -(int)Step.z);
+
+		int HitBit = -1;
+		int3 CellHitNormal = EntryNormal;
+		// TMax 是相对 block 入口的距离，TCurrent 必须也从 0 起算；
+		// 命中距离 HitT = TEnter + TCurrent（绝对），否则深度/调试灰度会错位出缝隙。
+		float TCurrent = 0.0;
+
+		[loop]
+		for (int i = 0; i < 64; i++)
+		{
+			uint Bit = (uint)((Cell.x & 3) | ((Cell.y & 3) << 2) | ((Cell.z & 3) << 4));
+			if (TestBit64(Bit, MaskLow, MaskHigh) != 0u)
+			{
+				HitBit = (int)Bit;
+				break;
+			}
+			if (TMax.x < TMax.y && TMax.x < TMax.z)
+			{
+				TCurrent = TMax.x;
+				Cell.x += (int)Step.x;
+				if (Cell.x < 0 || Cell.x > 3) break;
+				CellHitNormal = int3(-(int)Step.x, 0, 0);
+				TMax.x += TDelta.x;
+			}
+			else if (TMax.y < TMax.z)
+			{
+				TCurrent = TMax.y;
+				Cell.y += (int)Step.y;
+				if (Cell.y < 0 || Cell.y > 3) break;
+				CellHitNormal = int3(0, -(int)Step.y, 0);
+				TMax.y += TDelta.y;
+			}
+			else
+			{
+				TCurrent = TMax.z;
+				Cell.z += (int)Step.z;
+				if (Cell.z < 0 || Cell.z > 3) break;
+				CellHitNormal = int3(0, 0, -(int)Step.z);
+				TMax.z += TDelta.z;
+			}
+		}
+
+		if (HitBit < 0) discard;
+		HitT = TEnter + TCurrent;
+		HitNormal = VoxelNormalToWorld(CellHitNormal);
+		ColorIndex = RenderStartIndex + PopCountBelow64((uint)HitBit, MaskLow, MaskHigh);
+	}
+	else
+	{
+		// Level 1（合并原 LOD0）：2×2×2 粗网格 DDA
+		// 原 LOD0「整块实心」会把块的空区域也渲染出来，导致 LOD 过渡断裂
+		float3 EntryPos = VoxelOrigin + VoxelDir * TEnter;
+		float3 LocalPos = EntryPos - BlockVoxelMin; // [0,4]
+		int3 Cell = clamp(int3(floor(LocalPos * 0.5)), int3(0, 0, 0), int3(1, 1, 1));
+
+		float3 Step = float3(VoxelDir.x >= 0.0 ? 1.0 : -1.0, VoxelDir.y >= 0.0 ? 1.0 : -1.0, VoxelDir.z >= 0.0 ? 1.0 : -1.0);
+		float3 TDelta = abs(2.0 / VoxelDir);
+		float3 NextBoundary = (float3(Cell) + (Step > 0.0 ? 1.0 : 0.0)) * 2.0;
+		float3 TMax = (NextBoundary - LocalPos) / VoxelDir;
+
+		// 进入块的面法线（首个 cell 直接命中时用）：由 ray-box 的 TMin 最大轴决定
+		int3 EntryNormal;
+		if (TMin.x >= TMin.y && TMin.x >= TMin.z)
+			EntryNormal = int3(-(int)Step.x, 0, 0);
+		else if (TMin.y >= TMin.z)
+			EntryNormal = int3(0, -(int)Step.y, 0);
+		else
+			EntryNormal = int3(0, 0, -(int)Step.z);
+
+		int HitCoarseBit = -1;
+		int3 CellHitNormal = EntryNormal;
+		// TMax 是相对 block 入口的距离，TCurrent 必须也从 0 起算；
+		// 命中距离 HitT = TEnter + TCurrent（绝对），否则深度/调试灰度会错位出缝隙。
+		float TCurrent = 0.0;
+
+		[loop]
+		for (int i = 0; i < 8; i++)
+		{
+			uint CBit = (uint)((Cell.x & 1) | ((Cell.y & 1) << 1) | ((Cell.z & 1) << 2));
+			if ((CoarseMask & (1u << CBit)) != 0u)
+			{
+				HitCoarseBit = (int)CBit;
+				break;
+			}
+			if (TMax.x < TMax.y && TMax.x < TMax.z)
+			{
+				TCurrent = TMax.x;
+				Cell.x += (int)Step.x;
+				if (Cell.x < 0 || Cell.x > 1) break;
+				CellHitNormal = int3(-(int)Step.x, 0, 0);
+				TMax.x += TDelta.x;
+			}
+			else if (TMax.y < TMax.z)
+			{
+				TCurrent = TMax.y;
+				Cell.y += (int)Step.y;
+				if (Cell.y < 0 || Cell.y > 1) break;
+				CellHitNormal = int3(0, -(int)Step.y, 0);
+				TMax.y += TDelta.y;
+			}
+			else
+			{
+				TCurrent = TMax.z;
+				Cell.z += (int)Step.z;
+				if (Cell.z < 0 || Cell.z > 1) break;
+				CellHitNormal = int3(0, 0, -(int)Step.z);
+				TMax.z += TDelta.z;
+			}
+		}
+
+		if (HitCoarseBit < 0) discard;
+		uint Cx = (uint)HitCoarseBit & 1u;
+		uint Cy = ((uint)HitCoarseBit >> 1) & 1u;
+		uint Cz = ((uint)HitCoarseBit >> 2) & 1u;
+		uint FirstVoxelBit = (Cx * 2u) | ((Cy * 2u) << 2) | ((Cz * 2u) << 4);
+		HitT = TEnter + TCurrent;
+		HitNormal = VoxelNormalToWorld(CellHitNormal);
+		ColorIndex = RenderStartIndex + PopCountBelow64(FirstVoxelBit, MaskLow, MaskHigh);
+	}
+	// 深度覆写：写实际命中体素的深度（billboard 是平的，不覆写会错）
+	float3 HitWorldPos = CameraPos + RayDir * HitT;
+	float4 HitClip = mul(float4(HitWorldPos, 1.0), ViewProjectionMatrix);
+	OutDepth = HitClip.z / HitClip.w;
+
+	// 颜色 + 简单光照
+	if (bDebugDepth > 0.5)
+	{
+		// 调试：世界空间命中距离（近=黑，远=白），归一化到 2000 单位
+		// 用于验证 ray-box/DDA 算出的命中位置是否正确
+		float HitDistNorm = saturate(HitT / 2000.0);
+		OutColor = float4(HitDistNorm, HitDistNorm, HitDistNorm, 1.0);
+	}
+	else
+	{
+		float3 BaseColor = DecodeColor(VoxelDataBuffer[ColorIndex]);
+		OutColor = float4(Shade(BaseColor, HitNormal), 1.0);
+	}
+}
