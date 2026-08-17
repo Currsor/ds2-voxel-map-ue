@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="1" stop-color="#111a2e"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#172238" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#101827" stop-opacity="0.96"/>
+    </linearGradient>
+    <filter id="glowAmber" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowViolet" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#22d3ee"/>
+    </marker>
+    <style>
+      .title { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 700; fill: #f8fafc; }
+      .label { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 600; fill: #e2e8f0; }
+      .body { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #94a3b8; }
+      .mono { font-family: Consolas, "SFMono-Regular", monospace; fill: #cbd5e1; }
+      .cyan { fill: #22d3ee; }
+      .amber { fill: #fbbf24; }
+      .green { fill: #4ade80; }
+      .red { fill: #fb7185; }
+      .violet { fill: #a78bfa; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <circle cx="1310" cy="100" r="230" fill="#0ea5e9" opacity="0.05"/>
+  <circle cx="80" cy="850" r="260" fill="#8b5cf6" opacity="0.04"/>
+
+  <text x="72" y="76" class="title" font-size="34">补充 · 多轴同时跨面：一次事件同步推进所有命中轴</text>
+  <text x="72" y="111" class="body" font-size="17">当多个 tMax 在容差内相等，射线正好穿过体素棱或角；使用 axisMask 消除轴优先级带来的路径偏差</text>
+
+  <rect x="62" y="148" width="770" height="590" rx="22" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="860" y="148" width="518" height="590" rx="22" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+
+  <circle cx="94" cy="188" r="14" fill="#22d3ee" opacity="0.16"/>
+  <text x="94" y="194" class="label cyan" font-size="15" text-anchor="middle">1</text>
+  <text x="120" y="195" class="title" font-size="22">XY 共用棱穿越：从旧体素直接进入对角体素</text>
+  <text x="790" y="195" class="mono" font-size="14" text-anchor="end">Z = 1 slice</text>
+
+  <!-- top-down grid -->
+  <g transform="translate(116 244)">
+    <rect x="0" y="0" width="600" height="408" rx="8" fill="#0a1220" stroke="#64748b" stroke-width="2"/>
+    <g stroke="#40536b" stroke-width="1.4">
+      <path d="M0 102 H600 M0 204 H600 M0 306 H600"/>
+      <path d="M150 0 V408 M300 0 V408 M450 0 V408"/>
+    </g>
+
+    <!-- previous and next cells -->
+    <rect x="150" y="204" width="150" height="102" fill="#22d3ee" opacity="0.16" stroke="#22d3ee" stroke-width="2.5"/>
+    <rect x="300" y="102" width="150" height="102" fill="#a78bfa" opacity="0.24" stroke="#a78bfa" stroke-width="3"/>
+
+    <!-- zero-length side neighbors -->
+    <rect x="300" y="204" width="150" height="102" fill="#fb7185" opacity="0.07" stroke="#fb7185" stroke-width="2" stroke-dasharray="8 6"/>
+    <rect x="150" y="102" width="150" height="102" fill="#fb7185" opacity="0.07" stroke="#fb7185" stroke-width="2" stroke-dasharray="8 6"/>
+
+    <text x="225" y="242" class="label cyan" font-size="15" text-anchor="middle">当前体素</text>
+    <text x="225" y="265" class="mono cyan" font-size="13" text-anchor="middle">(1,1,1)</text>
+    <text x="375" y="141" class="label violet" font-size="15" text-anchor="middle">下一体素</text>
+    <text x="375" y="164" class="mono violet" font-size="13" text-anchor="middle">(2,2,1)</text>
+
+    <text x="375" y="248" class="body red" font-size="13" text-anchor="middle">X 侧邻</text>
+    <text x="375" y="269" class="mono red" font-size="12" text-anchor="middle">(2,1,1)</text>
+    <text x="225" y="146" class="body red" font-size="13" text-anchor="middle">Y 侧邻</text>
+    <text x="225" y="167" class="mono red" font-size="12" text-anchor="middle">(1,2,1)</text>
+
+    <!-- ray -->
+    <path d="M80 364 L522 64" fill="none" stroke="#fbbf24" stroke-width="3.2" marker-end="url(#arrowAmber)" filter="url(#glowAmber)"/>
+    <circle cx="300" cy="204" r="11" fill="#a78bfa" stroke="#ede9fe" stroke-width="3" filter="url(#glowViolet)"/>
+    <path d="M300 204 H444" stroke="#fb7185" stroke-width="2.5"/>
+    <path d="M300 204 V70" stroke="#4ade80" stroke-width="2.5"/>
+    <text x="452" y="210" class="label red" font-size="13">跨 X 面</text>
+    <text x="309" y="63" class="label green" font-size="13">跨 Y 面</text>
+
+    <rect x="18" y="18" width="246" height="67" rx="9" fill="#2e1065" stroke="#7c3aed"/>
+    <text x="36" y="43" class="label violet" font-size="14">同一个参数位置</text>
+    <text x="36" y="68" class="mono" font-size="13">tNext = tMaxX = tMaxY = 4</text>
+
+    <rect x="344" y="324" width="238" height="62" rx="9" fill="#3f0d18" stroke="#be123c"/>
+    <text x="362" y="348" class="label red" font-size="14">侧邻仅接触一个棱点</text>
+    <text x="362" y="371" class="body" font-size="12">射线在其中的区间长度为 0</text>
+  </g>
+
+  <rect x="101" y="674" width="692" height="44" rx="10" fill="#0f172a" stroke="#334155"/>
+  <text x="121" y="701" class="mono violet" font-size="14">mask = (1,1,0) → cell += step * mask → (2,2,1)</text>
+  <text x="618" y="701" class="body" font-size="12">X、Y 同轮推进</text>
+
+  <circle cx="892" cy="188" r="14" fill="#22d3ee" opacity="0.16"/>
+  <text x="892" y="194" class="label cyan" font-size="15" text-anchor="middle">2</text>
+  <text x="918" y="195" class="title" font-size="22">比较、推进与采样规则</text>
+
+  <rect x="898" y="224" width="442" height="88" rx="11" fill="#0f172a" stroke="#334155"/>
+  <text x="920" y="249" class="label" font-size="15">使用容差判断并列轴</text>
+  <text x="920" y="274" class="mono cyan" font-size="13">tNext = min(tMax.x, tMax.y, tMax.z)</text>
+  <text x="920" y="296" class="mono violet" font-size="13">mask = abs(tMax - tNext) &lt;= eps</text>
+
+  <path d="M1119 313 V337" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+  <rect x="898" y="346" width="442" height="100" rx="11" fill="#2e1065" stroke="#7c3aed"/>
+  <text x="920" y="372" class="label violet" font-size="15">一次事件同步推进</text>
+  <text x="920" y="397" class="mono" font-size="13">cell += step * mask;</text>
+  <text x="920" y="420" class="mono" font-size="13">tMax += tDelta * mask;</text>
+  <text x="920" y="439" class="body" font-size="12">本例：(4,4,8) → (5,8,8)</text>
+
+  <path d="M1119 447 V471" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+  <rect x="898" y="480" width="442" height="91" rx="11" fill="#19261d" stroke="#15803d"/>
+  <text x="920" y="506" class="label green" font-size="15">默认：thin-ray 语义</text>
+  <text x="920" y="531" class="mono green" font-size="13">只 test 最终 cell (2,2,1)</text>
+  <text x="920" y="553" class="body" font-size="12">跳过零长度侧邻，路径与 X/Y 判断顺序无关</text>
+
+  <rect x="898" y="588" width="442" height="116" rx="11" fill="#3f0d18" stroke="#be123c"/>
+  <text x="920" y="614" class="label red" font-size="15">可选：conservative supercover</text>
+  <text x="920" y="639" class="mono" font-size="12">test (2,1,1), (1,2,1), (2,2,1)</text>
+  <text x="920" y="662" class="body" font-size="12">用于“接触即命中”或防漏需求；需要固定采样顺序</text>
+  <text x="920" y="684" class="body" font-size="12">否则同一棱上的多个 solid 会产生不确定命中结果</text>
+
+  <!-- bottom rules -->
+  <rect x="62" y="772" width="1316" height="82" rx="15" fill="#0c1628" stroke="#1e3a5f"/>
+  <text x="88" y="803" class="label" font-size="16">实现约束</text>
+  <g font-size="13">
+    <rect x="190" y="788" width="311" height="48" rx="10" fill="#0f2538" stroke="#0e7490"/>
+    <text x="345" y="808" class="mono cyan" text-anchor="middle">epsilon = relative tolerance</text>
+    <text x="345" y="827" class="body" text-anchor="middle">随 t 尺度调整，避免固定误差失效</text>
+
+    <rect x="520" y="788" width="350" height="48" rx="10" fill="#2e1065" stroke="#7c3aed"/>
+    <text x="695" y="808" class="mono violet" text-anchor="middle">normal: deterministic tie-break</text>
+    <text x="695" y="827" class="body" text-anchor="middle">固定 X→Y→Z；或按 mask 输出棱法线</text>
+
+    <rect x="889" y="788" width="443" height="48" rx="10" fill="#19261d" stroke="#15803d"/>
+    <text x="1110" y="808" class="mono green" text-anchor="middle">2-axis = edge · 3-axis = corner</text>
+    <text x="1110" y="827" class="body" text-anchor="middle">三轴相等时同理，一次推进 XYZ 到对角体素</text>
+  </g>
+</svg>

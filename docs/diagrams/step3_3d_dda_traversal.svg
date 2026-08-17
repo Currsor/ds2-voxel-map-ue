@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="1" stop-color="#111a2e"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#172238" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#101827" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="hitTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fb7185" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#e11d48" stop-opacity="0.72"/>
+    </linearGradient>
+    <linearGradient id="hitSide" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#be123c" stop-opacity="0.74"/>
+      <stop offset="1" stop-color="#881337" stop-opacity="0.62"/>
+    </linearGradient>
+    <filter id="glowAmber" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#22d3ee"/>
+    </marker>
+    <style>
+      .title { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 700; fill: #f8fafc; }
+      .label { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 600; fill: #e2e8f0; }
+      .body { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #94a3b8; }
+      .mono { font-family: Consolas, "SFMono-Regular", monospace; fill: #cbd5e1; }
+      .cyan { fill: #22d3ee; }
+      .amber { fill: #fbbf24; }
+      .green { fill: #4ade80; }
+      .red { fill: #fb7185; }
+      .violet { fill: #a78bfa; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <circle cx="1310" cy="100" r="230" fill="#0ea5e9" opacity="0.05"/>
+  <circle cx="80" cy="850" r="260" fill="#8b5cf6" opacity="0.04"/>
+
+  <text x="72" y="76" class="title" font-size="34">Step 3 · 3D DDA：逐体素追踪射线直到命中</text>
+  <text x="72" y="111" class="body" font-size="17">每轮选择最小的 tMax，跨过对应轴的下一个体素面；并将该轴 tMax 加上固定的 tDelta</text>
+
+  <rect x="62" y="148" width="794" height="590" rx="22" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="884" y="148" width="494" height="590" rx="22" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+
+  <circle cx="94" cy="188" r="14" fill="#22d3ee" opacity="0.16"/>
+  <text x="94" y="194" class="label cyan" font-size="15" text-anchor="middle">1</text>
+  <text x="120" y="195" class="title" font-size="22">射线在 4 × 3 × 2 体素网格中步进</text>
+  <text x="812" y="195" class="mono" font-size="14" text-anchor="end">cell size = 1</text>
+
+  <!-- 3D grid: projection ex=(70,-25), ey=(-70,-25), ez=(0,-70) -->
+  <g fill="none">
+    <!-- hidden/internal edges: dashed -->
+    <g stroke="#33465d" stroke-width="1.15" stroke-dasharray="7 6" opacity="0.58">
+      <!-- bottom and middle interior grid -->
+      <path d="M500 635 L290 560 M570 610 L360 535 M640 585 L430 510"/>
+      <path d="M360 635 L640 535 M290 610 L570 510"/>
+      <path d="M500 565 L290 490 M570 540 L360 465 M640 515 L430 440"/>
+      <path d="M360 565 L640 465 M290 540 L570 440"/>
+      <!-- far edges on z=0 and z=1 -->
+      <path d="M710 560 L500 485 L220 585"/>
+      <path d="M710 490 L500 415 L220 515"/>
+      <!-- far-side vertical grid -->
+      <path d="M500 485 V345 M430 510 V370 M360 535 V395 M290 560 V420"/>
+    </g>
+
+    <!-- visible silhouette and front-face grid: solid -->
+    <g stroke="#40536b" stroke-width="1.2" opacity="0.82">
+      <!-- near edges on z=0 and z=1 -->
+      <path d="M220 585 L430 660 L710 560"/>
+      <path d="M220 515 L430 590 L710 490"/>
+      <!-- top face and top grid -->
+      <path d="M430 520 L710 420 L500 345 L220 445 Z" stroke="#60758e" stroke-width="1.7"/>
+      <path d="M500 495 L290 420 M570 470 L360 395 M640 445 L430 370"/>
+      <path d="M360 495 L640 395 M290 470 L570 370"/>
+      <!-- vertical grid on the two visible side faces -->
+      <path d="M430 660 V520 M500 635 V495 M570 610 V470 M640 585 V445 M710 560 V420"/>
+      <path d="M360 635 V495 M290 610 V470 M220 585 V445"/>
+    </g>
+  </g>
+
+  <!-- traversed cell highlights -->
+  <g stroke="#22d3ee" stroke-width="1.6">
+    <!-- cell 0,1,1 -->
+    <polygon points="360,565 430,540 360,515 290,540" fill="#22d3ee" opacity="0.12"/>
+    <polygon points="290,540 360,565 360,495 290,470" fill="#22d3ee" opacity="0.08"/>
+    <polygon points="360,565 430,540 430,470 360,495" fill="#22d3ee" opacity="0.08"/>
+    <!-- cell 1,1,1 -->
+    <polygon points="430,540 500,515 430,490 360,515" fill="#22d3ee" opacity="0.15"/>
+    <polygon points="360,515 430,540 430,470 360,445" fill="#22d3ee" opacity="0.09"/>
+    <polygon points="430,540 500,515 500,445 430,470" fill="#22d3ee" opacity="0.09"/>
+    <!-- cell 2,2,1 -->
+    <polygon points="430,490 500,465 430,440 360,465" fill="#a78bfa" opacity="0.20" stroke="#a78bfa"/>
+    <polygon points="360,465 430,490 430,420 360,395" fill="#a78bfa" opacity="0.10" stroke="#a78bfa"/>
+    <polygon points="430,490 500,465 500,395 430,420" fill="#a78bfa" opacity="0.10" stroke="#a78bfa"/>
+  </g>
+
+  <!-- target cell 3,2,1 -->
+  <g stroke="#fb7185" stroke-width="2.2" filter="url(#glowGreen)">
+    <polygon points="500,465 570,440 500,415 430,440" fill="url(#hitTop)"/>
+    <polygon points="430,440 500,465 500,395 430,370" fill="url(#hitSide)"/>
+    <polygon points="500,465 570,440 570,370 500,395" fill="#9f1239" opacity="0.78"/>
+  </g>
+  <text x="511" y="422" class="title" font-size="14" text-anchor="middle">HIT</text>
+  <text x="511" y="439" class="mono" font-size="11" text-anchor="middle">(3,2,1)</text>
+
+  <!-- ray and valid segment -->
+  <path d="M256 588 L590 334" fill="none" stroke="#fbbf24" stroke-width="2.7" marker-end="url(#arrowAmber)" opacity="0.92" filter="url(#glowAmber)"/>
+  <path d="M325 535 L483 415" fill="none" stroke="#4ade80" stroke-width="7" stroke-linecap="round" opacity="0.90"/>
+
+  <!-- crossing points -->
+  <g>
+    <circle cx="325" cy="535" r="8" fill="#4ade80" stroke="#dcfce7" stroke-width="2"/>
+    <circle cx="378" cy="495" r="8" fill="#22d3ee" stroke="#cffafe" stroke-width="2"/>
+    <circle cx="430" cy="455" r="9" fill="#a78bfa" stroke="#ede9fe" stroke-width="2"/>
+    <circle cx="483" cy="415" r="10" fill="#fb7185" stroke="#ffe4e6" stroke-width="2"/>
+  </g>
+
+  <g class="mono" font-size="12">
+    <rect x="242" y="550" width="111" height="42" rx="8" fill="#052e1a" stroke="#166534"/>
+    <text x="255" y="568" class="green">t=2 · entry</text>
+    <text x="255" y="585">cell (0,1,1)</text>
+
+    <rect x="373" y="530" width="115" height="42" rx="8" fill="#082f49" stroke="#0e7490"/>
+    <text x="386" y="548" class="cyan">t=3 · cross X</text>
+    <text x="386" y="565">cell (1,1,1)</text>
+
+    <rect x="255" y="385" width="146" height="47" rx="8" fill="#2e1065" stroke="#7c3aed"/>
+    <text x="268" y="404" class="violet">t=4 · cross X + Y</text>
+    <text x="268" y="422">cell (2,2,1)</text>
+
+    <path d="M402 419 L426 451" stroke="#a78bfa" stroke-width="1.3"/>
+
+    <rect x="535" y="452" width="132" height="47" rx="8" fill="#3f0d18" stroke="#be123c"/>
+    <text x="548" y="471" class="red">t=5 · cross X</text>
+    <text x="548" y="489">cell (3,2,1)</text>
+    <path d="M535 462 L488 420" stroke="#fb7185" stroke-width="1.3"/>
+  </g>
+
+  <!-- axes -->
+  <g transform="translate(698 646)" stroke-width="2" fill="none">
+    <path d="M0 0 L53 -19" stroke="#fb7185" marker-end="url(#arrowCyan)"/>
+    <path d="M0 0 L-53 -19" stroke="#4ade80" marker-end="url(#arrowCyan)"/>
+    <path d="M0 0 L0 -58" stroke="#60a5fa" marker-end="url(#arrowCyan)"/>
+    <text x="60" y="-17" class="label red" font-size="13">+X</text>
+    <text x="-76" y="-17" class="label green" font-size="13">+Y</text>
+    <text x="8" y="-60" class="label" font-size="13" fill="#60a5fa">+Z</text>
+  </g>
+
+  <rect x="100" y="670" width="718" height="48" rx="10" fill="#0f172a" stroke="#334155"/>
+  <text x="122" y="691" class="mono" font-size="13">D=(1, 0.25, 0.125)  →  step=(+1,+1,+1)</text>
+  <text x="122" y="710" class="body" font-size="13">射线在 t=5 进入非空体素 (3,2,1)，立即停止遍历并返回命中。</text>
+
+  <circle cx="916" cy="188" r="14" fill="#22d3ee" opacity="0.16"/>
+  <text x="916" y="194" class="label cyan" font-size="15" text-anchor="middle">2</text>
+  <text x="942" y="195" class="title" font-size="22">每轮只做比较与累加</text>
+
+  <rect x="918" y="224" width="426" height="98" rx="12" fill="#0f172a" stroke="#334155"/>
+  <text x="940" y="249" class="label" font-size="15">初始化于 tEntry = 2</text>
+  <text x="940" y="275" class="mono cyan" font-size="14">tMax   = (3, 4, 8)</text>
+  <text x="940" y="300" class="mono" font-size="14">tDelta = (1, 4, 8)</text>
+
+  <!-- iteration rows -->
+  <g>
+    <rect x="918" y="342" width="426" height="73" rx="11" fill="#082f49" stroke="#0e7490"/>
+    <circle cx="946" cy="378" r="15" fill="#22d3ee" opacity="0.18"/>
+    <text x="946" y="383" class="label cyan" font-size="14" text-anchor="middle">①</text>
+    <text x="974" y="369" class="mono" font-size="13">min(3,4,8) = X</text>
+    <text x="974" y="393" class="body" font-size="13">x++，tMaxX: 3 → 4</text>
+    <text x="1230" y="382" class="mono cyan" font-size="13">(1,1,1)</text>
+
+    <rect x="918" y="427" width="426" height="84" rx="11" fill="#2e1065" stroke="#7c3aed"/>
+    <circle cx="946" cy="469" r="15" fill="#a78bfa" opacity="0.20"/>
+    <text x="946" y="474" class="label violet" font-size="14" text-anchor="middle">②</text>
+    <text x="974" y="453" class="mono" font-size="13">min(4,4,8) = X + Y</text>
+    <text x="974" y="477" class="body" font-size="13">x++，y++；两个 tMax 同时累加</text>
+    <text x="974" y="498" class="mono violet" font-size="12">tMax → (5,8,8)</text>
+    <text x="1230" y="470" class="mono violet" font-size="13">(2,2,1)</text>
+
+    <rect x="918" y="523" width="426" height="73" rx="11" fill="#082f49" stroke="#0e7490"/>
+    <circle cx="946" cy="559" r="15" fill="#22d3ee" opacity="0.18"/>
+    <text x="946" y="564" class="label cyan" font-size="14" text-anchor="middle">③</text>
+    <text x="974" y="550" class="mono" font-size="13">min(5,8,8) = X</text>
+    <text x="974" y="574" class="body" font-size="13">x++，tMaxX: 5 → 6</text>
+    <text x="1230" y="563" class="mono cyan" font-size="13">(3,2,1)</text>
+  </g>
+
+  <rect x="918" y="616" width="426" height="82" rx="12" fill="#3f0d18" stroke="#be123c" stroke-width="1.5"/>
+  <circle cx="948" cy="657" r="10" fill="#fb7185"/>
+  <text x="974" y="650" class="label red" font-size="16">occupancy == solid</text>
+  <text x="974" y="676" class="mono" font-size="14">return Hit(cell, t=5)</text>
+
+  <!-- bottom mechanism strip -->
+  <rect x="62" y="772" width="1316" height="82" rx="15" fill="#0c1628" stroke="#1e3a5f"/>
+  <text x="88" y="803" class="label" font-size="16">核心机制</text>
+  <g font-size="14">
+    <rect x="192" y="788" width="199" height="48" rx="10" fill="#0f2538" stroke="#0e7490"/>
+    <text x="291" y="808" class="mono cyan" text-anchor="middle">axis = argmin(tMax)</text>
+    <text x="291" y="827" class="body" text-anchor="middle">找最近的下一个网格面</text>
+    <path d="M399 812 H439" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+    <rect x="449" y="788" width="203" height="48" rx="10" fill="#0f2538" stroke="#0e7490"/>
+    <text x="550" y="808" class="mono cyan" text-anchor="middle">cell[axis] += step</text>
+    <text x="550" y="827" class="body" text-anchor="middle">进入相邻体素</text>
+    <path d="M660 812 H700" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+    <rect x="710" y="788" width="221" height="48" rx="10" fill="#0f2538" stroke="#0e7490"/>
+    <text x="820" y="808" class="mono cyan" text-anchor="middle">tMax[axis] += tDelta</text>
+    <text x="820" y="827" class="body" text-anchor="middle">推进到该轴的再下一个面</text>
+    <path d="M939 812 H979" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+    <rect x="989" y="788" width="343" height="48" rx="10" fill="#19261d" stroke="#15803d"/>
+    <text x="1160" y="808" class="mono green" text-anchor="middle">test voxel → hit / continue</text>
+    <text x="1160" y="827" class="body" text-anchor="middle">命中即停；否则重复上述过程</text>
+  </g>
+</svg>
