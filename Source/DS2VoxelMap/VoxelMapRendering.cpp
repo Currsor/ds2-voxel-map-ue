@@ -78,7 +78,7 @@ void FVoxelMapSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& G
 	UTextureRenderTarget2D* RT = Renderer->RenderTarget;
 	const FVoxelMapData& Data = Renderer->GetVoxelMapData();
 
-	if (!BlockDataBuffer.IsValid() || !BlockDataSRV.IsValid() || !VoxelDataSRV.IsValid() || Data.BlockCount == 0 || !RT || !RT->GetRenderTargetResource() || !Renderer->MapCamera)
+	if (!BlockDataBuffer.IsValid() || !BlockDataSRV.IsValid() || !VoxelDataSRV.IsValid() || Data.BlockCount == 0 || !RT || !RT->GetRenderTargetResource() || !Renderer->DisplayCamera)
 	{
 		return;
 	}
@@ -90,16 +90,19 @@ void FVoxelMapSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& G
 		FRDGTextureDesc::Create2D(FIntPoint(RT->SizeX, RT->SizeY), PF_DepthStencil, FClearValueBinding::DepthFar, TexCreate_DepthStencilTargetable),
 		TEXT("VoxelMapDepth"));
 
-	// M5：独立地图相机（每帧直接读当前 transform，手动拖动也实时反映）
-	UCameraComponent* Cam = Renderer->MapCamera;
+	// DisplayCamera 同时是玩家视角与体素渲染视角，移动后会在下一帧生成对应的新 RT。
+	UCameraComponent* Cam = Renderer->DisplayCamera;
 	const FVector Eye = Cam->GetComponentLocation();
 	const FRotator CamRot = Cam->GetComponentRotation();
-	const float FOV = Cam->FieldOfView;
+	const float FOV = FMath::Clamp(Cam->FieldOfView, 5.0f, 170.0f);
+	const int32 ViewWidth = FMath::Max(View.UnscaledViewRect.Width(), 1);
+	const int32 ViewHeight = FMath::Max(View.UnscaledViewRect.Height(), 1);
+	const float DisplayAspectRatio = static_cast<float>(ViewWidth) / static_cast<float>(ViewHeight);
 	const FVector Right = CamRot.RotateVector(FVector::RightVector);
 	const FVector Up = CamRot.RotateVector(FVector::UpVector);
 
-	// UE 相机约定：相机看向 +X，视图矩阵 = 平移(-Eye) × 逆旋转 × 轴交换矩阵
-	// （与 SceneView.cpp 中 ViewMatrix 的构造一致）
+	// UE 相机的 FieldOfView 是水平 FOV。使用最终玩家视口的宽高比预补偿方形 RT，
+	// 这样 RT 在后处理材质中铺满宽屏时不会把画面横向拉宽。
 	FMatrix ViewPlanesMatrix(
 		FPlane(0.0f, 0.0f, 1.0f, 0.0f),
 		FPlane(1.0f, 0.0f, 0.0f, 0.0f),
@@ -108,7 +111,7 @@ void FVoxelMapSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& G
 	FMatrix ViewMatrix = FTranslationMatrix(-Eye) * FInverseRotationMatrix(CamRot) * ViewPlanesMatrix;
 	FMatrix ProjMatrix = FReversedZPerspectiveMatrix(
 		FMath::DegreesToRadians(FOV) * 0.5f,
-		1.0f, 1.0f, 1.0f, 100000.0f); // Near=1cm，贴近观察不裁掉前景体素
+		DisplayAspectRatio, 1.0f, 1.0f, 100000.0f);
 	FMatrix ViewProjD = ViewMatrix * ProjMatrix;
 	const FMatrix44f ViewProj(ViewProjD);
 
@@ -124,7 +127,7 @@ void FVoxelMapSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& G
 	VSParams->CameraPos = FVector3f(Eye.X, Eye.Y, Eye.Z);
 	VSParams->BlockGrid = FVector4f((float)Data.BlockGridSize.X, (float)Data.BlockGridSize.Y, (float)Data.BlockGridSize.Z, 0.0f);
 	VSParams->WorldOrigin = FVector3f(Renderer->GetVoxelWorldOrigin());
-	VSParams->VoxelSize = Renderer->VoxelSize;
+	VSParams->VoxelSize = Renderer->GetVoxelSize();
 	VSParams->BillboardHalfSizeScale = Renderer->BillboardScale;
 	for (int32 i = 0; i < FMath::Min(6, Frustum.Planes.Num()); ++i)
 	{
@@ -139,7 +142,7 @@ void FVoxelMapSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& G
 	PSParams->CameraPos = FVector3f(Eye.X, Eye.Y, Eye.Z);
 	PSParams->BlockGrid = FVector4f((float)Data.BlockGridSize.X, (float)Data.BlockGridSize.Y, (float)Data.BlockGridSize.Z, 0.0f);
 	PSParams->WorldOrigin = FVector3f(Renderer->GetVoxelWorldOrigin());
-	PSParams->VoxelSize = Renderer->VoxelSize;
+	PSParams->VoxelSize = Renderer->GetVoxelSize();
 	PSParams->LODDistances = FVector2f(Renderer->LOD2Distance, Renderer->LOD1Distance);
 	PSParams->bDebugDepth = Renderer->bDebugDepth ? 1.0f : 0.0f;
 	PSParams->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);

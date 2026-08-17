@@ -27,7 +27,24 @@
 - Windows：Visual Studio + Windows SDK；macOS：Xcode + clang
 - 新建 **C++ 工程**（非纯蓝图）
 
+## 使用烘焙地图
+
+1. 在内容浏览器中创建 `Miscellaneous > Data Asset`，类型选择 `VoxelMapDataAsset`。
+2. 在关卡中放置 `VoxelMapCollector`，设置生成参数和 `Output Data Asset`，点击 `Bake Voxel Map`。普通默认规模为 `256×128×256`。
+3. 性能测试时点击 `Bake Performance Test`，默认生成 `512×128×512` 数据；输出日志会记录 block 数、占用体素数、数据体积、生成和验证耗时。烘焙后保存数据资产。
+4. 在关卡中放置或更新 `DS2VoxelMapRenderer`，把数据资产设置给 `Voxel Map Asset`，把后处理材质设置给 `Display Post Process Material`。
+5. 后处理材质必须是 `Post Process` 域，并包含名为 `VoxelMapRT` 的 Texture Parameter。
+6. 运行游戏后，显示器只加载已烘焙数据，并由第一个玩家控制器自动 Possess；代码会切换到 `Game Only` 输入并禁用观察 Pawn 碰撞。
+7. 相机控制使用 Unreal Engine 的 `ADefaultPawn` 输入：`W/A/S/D` 平移，`Q/E` 或 `C/Space` 下降/上升，鼠标直接转向，不需要按住右键。
+8. `Display Field Of View` 默认是 `60` 度，可在 Renderer 或蓝图中调整；体素投影会自动按当前玩家视口宽高比补偿，方形 RenderTarget 铺满宽屏时不会横向拉伸。
+9. 速度、加速度、减速度和转向响应可在 `MovementComponent` 的 `FloatingPawnMovement` 分类中调整。若由其他 Pawn 管理控制器，关闭 `Auto Possess Display Camera`。
+
+
+
+采集完成后可从运行时关卡删除 `VoxelMapCollector`；该 Actor 标记为 Editor Only，不会进入打包游戏。
+
 ## 参考资料
+
 
 - [GDC Vault — 'DEATH STRANDING 2': Making of Voxel 3D UI Map](https://gdcvault.com/play/1035737/-DEATH-STRANDING-2-Making)（演讲者 Ildar Valeev，KOJIMA PRODUCTIONS）
 - [Doris Wu 博客 — Death Stranding 2 Voxel Map Learning](https://show50726.github.io/posts/Death-Stranding-2-Voxel-Map-Learning/)

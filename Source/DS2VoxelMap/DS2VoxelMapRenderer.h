@@ -1,109 +1,79 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "GameFramework/DefaultPawn.h"
 #include "RHIFwd.h"
 #include "VoxelMapGenerator.h"
 #include "DS2VoxelMapRenderer.generated.h"
 
 class UTextureRenderTarget2D;
 class UCameraComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UVoxelMapDataAsset;
 class FVoxelMapSceneViewExtension;
 
 /**
- * 渲染骨架 Actor：
- *  - M0：独立 RT + 独立相机。
- *  - M1：CPU 体素化数据（FVoxelMapData）。
- *  - M2：数据上传 GPU（StructuredBuffer + SRV）。
- *  - M3：自定义全局 shader（billboard 顶点着色器）。
- *  - M4：片元着色器（ray-box + DDA + LOD + 深度覆写）。
- *  - M5：独立地图相机（轨道相机）。
+ * 运行时体素地图观察者：加载已烘焙的数据资产，使用引擎原生 DefaultPawn 输入和
+ * SpectatorPawnMovement 驱动 DisplayCamera，并通过后处理材质全屏显示体素 RenderTarget。
  */
 UCLASS()
-class DS2VOXELMAP_API ADS2VoxelMapRenderer : public AActor
+class DS2VOXELMAP_API ADS2VoxelMapRenderer : public ADefaultPawn
 {
 	GENERATED_BODY()
 
 public:
-	ADS2VoxelMapRenderer();
+	ADS2VoxelMapRenderer(const FObjectInitializer& ObjectInitializer);
 
-	// ---- M0：渲染目标（独立输出表面） ----
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VoxelMap")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Data")
+	TObjectPtr<UVoxelMapDataAsset> VoxelMapAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Render")
 	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Render", meta = (ClampMin = "1", UIMin = "1"))
 	int32 Resolution = 1024;
 
-	// ---- M1：体素生成参数 ----
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	FIntVector VoxelGridSize = FIntVector(128, 128, 128);
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VoxelMap|Display")
+	TObjectPtr<UCameraComponent> DisplayCamera;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	int32 VoxelSeed = 1337;
+	/** Post Process 材质，须包含名为 VoxelMapRT 的 Texture Parameter。 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VoxelMap|Display")
+	TObjectPtr<UMaterialInterface> DisplayPostProcessMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	float TerrainHeight = 48.0f;
+	/** 水平视场角。较小的值可减少画面边缘的透视夸张。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Display", meta = (ClampMin = "5.0", ClampMax = "170.0", UIMin = "30.0", UIMax = "120.0"))
+	float DisplayFieldOfView = 60.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	float TerrainAmplitude = 32.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	float NoiseFrequency = 0.03f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	int32 NoiseOctaves = 4;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Generation")
-	bool bFlatTerrain = false; // 调试：完全平面地形（表面高度 = TerrainHeight）
-
-	// ---- M3：渲染参数 ----
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap")
-	float VoxelSize = 10.0f;
-
-	// ---- M4：LOD 距离阈值（世界单位） ----
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|LOD")
-	float LOD2Distance = 600.0f;  // 小于此距离：完整 4×4×4 DDA
+	/** 开始游戏时让第一个玩家控制器直接控制这个观察者 Pawn。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Display")
+	bool bAutoPossessDisplayCamera = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|LOD")
-	float LOD1Distance = 1200.0f; // 小于此距离：2×2×2 粗网格；更远：整个 block
+	float LOD2Distance = 600.0f;
 
-	// ---- M6：性能参数 ----
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|LOD")
+	float LOD1Distance = 1200.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Performance")
-	float BillboardScale = 1.1f; // billboard 尺寸安全余量（距离自适应后乘此值，>1 留余量）
+	float BillboardScale = 1.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Performance")
-	bool bDebugDepth = false; // 调试：把深度渲染成灰度（近=白，远=黑），验证遮挡
-
-	// ---- M5：独立地图相机 + 轨道 ----
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VoxelMap")
-	TObjectPtr<UCameraComponent> MapCamera;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Camera")
-	bool bAutoOrbit = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Camera")
-	float OrbitSpeed = 15.0f;   // 度/秒
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Camera")
-	float OrbitDistance = 0.0f; // 0 = 按地形自动
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Camera")
-	float OrbitHeight = 0.0f;   // 0 = 按地形自动
+	bool bDebugDepth = false;
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelMap")
 	UTextureRenderTarget2D* GetRenderTarget() const { return RenderTarget.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelMap")
-	void RegenerateVoxelMap();
+	bool ReloadVoxelMapAsset();
 
-	/** 把 RT 当前内容导出为 CSV（x,y,R,G,B），用于诊断 */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VoxelMap")
 	void ExportRenderTargetToCSV();
 
 	const FVoxelMapData& GetVoxelMapData() const { return VoxelMapData; }
-	FVector GetVoxelWorldOrigin() const;
+	FVector GetVoxelWorldOrigin() const { return VoxelWorldOrigin; }
+	float GetVoxelSize() const { return RuntimeVoxelSize; }
 
-	// ---- GPU 缓冲 + SRV（渲染线程读取） ----
 	FBufferRHIRef BlockDataBuffer;
 	FBufferRHIRef VoxelDataBuffer;
 	FShaderResourceViewRHIRef BlockDataSRV;
@@ -113,16 +83,19 @@ protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	virtual void Tick(float DeltaSeconds) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
 	void CreateRenderTarget();
-	FVoxelMapConfig BuildVoxelConfig() const;
 	void UploadVoxelMapToGPU();
 	void EnsureViewExtension();
-	void UpdateMapCamera();
+	void SetupDisplayCamera();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> DisplayMaterialInstance;
 
 	FVoxelMapData VoxelMapData;
+	FVector VoxelWorldOrigin = FVector::ZeroVector;
+	float RuntimeVoxelSize = 10.0f;
 	TSharedPtr<FVoxelMapSceneViewExtension, ESPMode::ThreadSafe> ViewExtension;
-	float OrbitAngle = 0.0f;
 };

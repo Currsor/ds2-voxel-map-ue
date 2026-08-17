@@ -1,68 +1,101 @@
 #include "DS2VoxelMapRenderer.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/SphereComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "GameFramework/FloatingPawnMovement.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/SpectatorPawnMovement.h"
+#include "GameFramework/PlayerInput.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "RenderingThread.h"
 #include "RHICommandList.h"
 #include "RHIResources.h"
 #include "Containers/DynamicRHIResourceArray.h"
 #include "SceneViewExtension.h"
+#include "VoxelMapDataAsset.h"
 #include "VoxelMapRendering.h"
 #include "Misc/FileHelper.h"
 
-ADS2VoxelMapRenderer::ADS2VoxelMapRenderer()
+ADS2VoxelMapRenderer::ADS2VoxelMapRenderer(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer
+		.SetDefaultSubobjectClass<USpectatorPawnMovement>(ADefaultPawn::MovementComponentName)
+		.DoNotCreateDefaultSubobject(ADefaultPawn::MeshComponentName))
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
+	AutoPossessPlayer = EAutoReceiveInput::Disabled;
+	bAddDefaultMovementBindings = true;
+	bUseControllerRotationPitch = true;
+	bUseControllerRotationYaw = true;
+	bUseControllerRotationRoll = false;
 
-	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	SetRootComponent(Root);
+	if (USphereComponent* Collision = GetCollisionComponent())
+	{
+		Collision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Collision->SetGenerateOverlapEvents(false);
+	}
 
-	// 独立地图相机（M5）
-	MapCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("MapCamera"));
-	MapCamera->FieldOfView = 60.0f;
-	MapCamera->SetupAttachment(Root);
+	DisplayCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("DisplayCamera"));
+	DisplayCamera->SetupAttachment(GetRootComponent());
+	DisplayCamera->SetAutoActivate(true);
+	DisplayCamera->bUsePawnControlRotation = true;
+	DisplayCamera->FieldOfView = DisplayFieldOfView;
+	DisplayCamera->bConstrainAspectRatio = false;
+	DisplayCamera->PostProcessBlendWeight = 1.0f;
 
-	CreateRenderTarget();
+	if (UFloatingPawnMovement* FloatingMovement = Cast<UFloatingPawnMovement>(GetMovementComponent()))
+	{
+		FloatingMovement->MaxSpeed = 2400.0f;
+		FloatingMovement->Acceleration = 8000.0f;
+		FloatingMovement->Deceleration = 8000.0f;
+		FloatingMovement->TurningBoost = 8.0f;
+	}
 }
 
 void ADS2VoxelMapRenderer::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	RegenerateVoxelMap();
-	UpdateMapCamera();
-	EnsureViewExtension();
+	if (DisplayCamera)
+	{
+		DisplayCamera->SetFieldOfView(DisplayFieldOfView);
+	}
+	CreateRenderTarget();
 }
 
 void ADS2VoxelMapRenderer::BeginPlay()
 {
 	Super::BeginPlay();
-	RegenerateVoxelMap();
-	UpdateMapCamera();
+	CreateRenderTarget();
+	ReloadVoxelMapAsset();
 	EnsureViewExtension();
+	SetupDisplayCamera();
 }
 
 void ADS2VoxelMapRenderer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (DisplayCamera && DisplayMaterialInstance)
+	{
+		DisplayCamera->RemoveBlendable(DisplayMaterialInstance);
+	}
+	DisplayMaterialInstance = nullptr;
 	ViewExtension.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
-void ADS2VoxelMapRenderer::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	if (bAutoOrbit)
-	{
-		OrbitAngle = FMath::Fmod(OrbitAngle + OrbitSpeed * DeltaSeconds, 360.0f);
-		UpdateMapCamera();
-	}
-}
-
 void ADS2VoxelMapRenderer::CreateRenderTarget()
 {
-	// 运行时创建、每次构造重建的 RT 用 RF_Transient，避免它（连同继承自 UTexture 的
-	// AssetImportData 编辑器子对象）被序列化进关卡，导致保存 .umap 报错。
-	RenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("VoxelMapRenderTarget"), RF_Transient);
-	RenderTarget->InitCustomFormat((uint32)Resolution, (uint32)Resolution, PF_B8G8R8A8, /*bInForceLinearGamma=*/false);
+	if (RenderTarget)
+	{
+		const bool bIsRuntimeRenderTarget = RenderTarget->GetOuter() == this && RenderTarget->HasAnyFlags(RF_Transient);
+		if (!bIsRuntimeRenderTarget || (RenderTarget->SizeX == Resolution && RenderTarget->SizeY == Resolution))
+		{
+			return;
+		}
+	}
+
+	RenderTarget = NewObject<UTextureRenderTarget2D>(this, NAME_None, RF_Transient);
+	RenderTarget->InitCustomFormat(static_cast<uint32>(Resolution), static_cast<uint32>(Resolution), PF_B8G8R8A8, false);
 	RenderTarget->ClearColor = FLinearColor::Black;
 #if WITH_EDITORONLY_DATA
 	RenderTarget->AssetImportData = nullptr;
@@ -70,17 +103,84 @@ void ADS2VoxelMapRenderer::CreateRenderTarget()
 	RenderTarget->UpdateResource();
 }
 
-FVoxelMapConfig ADS2VoxelMapRenderer::BuildVoxelConfig() const
+bool ADS2VoxelMapRenderer::ReloadVoxelMapAsset()
 {
-	FVoxelMapConfig Config;
-	Config.GridSize = VoxelGridSize;
-	Config.Seed = VoxelSeed;
-	Config.TerrainHeight = TerrainHeight;
-	Config.TerrainAmplitude = TerrainAmplitude;
-	Config.NoiseFrequency = NoiseFrequency;
-	Config.NoiseOctaves = NoiseOctaves;
-	Config.bFlatTerrain = bFlatTerrain;
-	return Config;
+	if (!VoxelMapAsset)
+	{
+		VoxelMapData.Reset();
+		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] No VoxelMapAsset assigned; bake and assign one before play"));
+		return false;
+	}
+
+	if (!FVoxelMapGenerator::Validate(VoxelMapAsset->Data))
+	{
+		VoxelMapData.Reset();
+		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Assigned VoxelMapAsset contains invalid data"));
+		return false;
+	}
+
+	VoxelMapData = VoxelMapAsset->Data;
+	RuntimeVoxelSize = VoxelMapAsset->VoxelSize;
+	VoxelWorldOrigin = VoxelMapAsset->WorldOrigin;
+	UploadVoxelMapToGPU();
+
+	UE_LOG(LogTemp, Log, TEXT("[VoxelMap] Loaded asset: %d blocks, %d occupied voxels"),
+		VoxelMapData.BlockCount, VoxelMapData.OccupiedVoxelCount);
+	return true;
+}
+
+void ADS2VoxelMapRenderer::SetupDisplayCamera()
+{
+	if (!DisplayCamera || !DisplayPostProcessMaterial || !RenderTarget)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[VoxelMap] Display camera disabled: Camera=%s, Material=%s, RenderTarget=%s"),
+			DisplayCamera ? TEXT("OK") : TEXT("Missing"),
+			DisplayPostProcessMaterial ? TEXT("OK") : TEXT("Missing"),
+			RenderTarget ? TEXT("OK") : TEXT("Missing"));
+		return;
+	}
+
+	if (DisplayMaterialInstance)
+	{
+		DisplayCamera->RemoveBlendable(DisplayMaterialInstance);
+	}
+
+	DisplayMaterialInstance = UMaterialInstanceDynamic::Create(DisplayPostProcessMaterial, this);
+	if (!DisplayMaterialInstance)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Failed to create display material instance"));
+		return;
+	}
+
+	DisplayMaterialInstance->SetTextureParameterValue(TEXT("VoxelMapRT"), RenderTarget);
+	DisplayCamera->AddOrUpdateBlendable(DisplayMaterialInstance, 1.0f);
+
+	if (bAutoPossessDisplayCamera)
+	{
+		if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+		{
+			DisplayCamera->SetFieldOfView(DisplayFieldOfView);
+			DisplayCamera->Activate(true);
+			PlayerController->Possess(this);
+			PlayerController->SetControlRotation(GetActorRotation());
+			PlayerController->SetInputMode(FInputModeGameOnly());
+			PlayerController->bShowMouseCursor = false;
+			UE_LOG(LogTemp, Log, TEXT("[VoxelMap] Display pawn possessed: %s, InputComponent=%s"),
+				PlayerController->GetPawn() == this ? TEXT("yes") : TEXT("no"),
+				InputComponent ? TEXT("ready") : TEXT("missing"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] No player controller found for display camera"));
+		}
+	}
+}
+
+void ADS2VoxelMapRenderer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	bAddDefaultMovementBindings = true;
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
 
 void ADS2VoxelMapRenderer::EnsureViewExtension()
@@ -91,47 +191,12 @@ void ADS2VoxelMapRenderer::EnsureViewExtension()
 	}
 }
 
-FVector ADS2VoxelMapRenderer::GetVoxelWorldOrigin() const
-{
-	const FIntVector VoxelGrid = VoxelMapData.BlockGridSize * VOXELMAP_BLOCK_SIZE;
-	const FVector HalfWorld(
-		(float)VoxelGrid.X * VoxelSize * 0.5f,
-		(float)VoxelGrid.Z * VoxelSize * 0.5f,
-		(float)VoxelGrid.Y * VoxelSize * 0.5f);
-	return GetActorLocation() - HalfWorld;
-}
-
-void ADS2VoxelMapRenderer::UpdateMapCamera()
-{
-	if (bAutoOrbit && MapCamera)
-	{
-		// 轨道相机：绕地形中心旋转，俯视
-		const FIntVector VoxelGrid = VoxelMapData.BlockGridSize * VOXELMAP_BLOCK_SIZE;
-		const FVector HalfWorld(
-			(float)VoxelGrid.X * VoxelSize * 0.5f,
-			(float)VoxelGrid.Z * VoxelSize * 0.5f,
-			(float)VoxelGrid.Y * VoxelSize * 0.5f);
-		const FVector Center = GetActorLocation();
-		const float MaxExtent = FMath::Max(HalfWorld.X, HalfWorld.Y);
-		const float Dist = OrbitDistance > 0.0f ? OrbitDistance : MaxExtent * 1.6f;
-		const float Height = OrbitHeight > 0.0f ? OrbitHeight : MaxExtent * 1.4f;
-		const float AngleRad = FMath::DegreesToRadians(OrbitAngle);
-		const FVector Eye = Center + FVector(FMath::Cos(AngleRad) * Dist, FMath::Sin(AngleRad) * Dist, Height);
-		const FRotator LookRot = (Center - Eye).Rotation();
-
-		MapCamera->SetWorldLocation(Eye);
-		MapCamera->SetWorldRotation(LookRot);
-	}
-}
-
 void ADS2VoxelMapRenderer::UploadVoxelMapToGPU()
 {
-	// 拷贝数据进渲染线程 lambda（游戏线程的数组可能随后变化/重分配）
 	TArray<uint32> BlockDataCopy = VoxelMapData.BlockData;
 	TArray<uint32> VoxelDataCopy = VoxelMapData.VoxelData;
 	const int32 BlockCount = VoxelMapData.BlockCount;
 	const int32 VoxelCount = VoxelMapData.OccupiedVoxelCount;
-
 	ADS2VoxelMapRenderer* ThisPtr = this;
 
 	ENQUEUE_RENDER_COMMAND(UploadVoxelMap)(
@@ -141,40 +206,26 @@ void ADS2VoxelMapRenderer::UploadVoxelMapToGPU()
 			if (BlockDataCopy.Num() > 0)
 			{
 				TResourceArray<uint32> Arr;
-				Arr.Reserve(BlockDataCopy.Num());
-				for (uint32 V : BlockDataCopy) { Arr.Add(V); }
+				Arr.Append(BlockDataCopy);
 				FRHIResourceCreateInfo Info(TEXT("VoxelMapBlockData"), &Arr);
-				BlockBuf = RHICmdList.CreateStructuredBuffer(sizeof(uint32), (uint32)(BlockDataCopy.Num() * sizeof(uint32)), BUF_ShaderResource | BUF_Static, Info);
+				BlockBuf = RHICmdList.CreateStructuredBuffer(sizeof(uint32), static_cast<uint32>(BlockDataCopy.Num() * sizeof(uint32)), BUF_ShaderResource | BUF_Static, Info);
 			}
 
 			FBufferRHIRef VoxelBuf;
 			if (VoxelDataCopy.Num() > 0)
 			{
 				TResourceArray<uint32> Arr;
-				Arr.Reserve(VoxelDataCopy.Num());
-				for (uint32 V : VoxelDataCopy) { Arr.Add(V); }
+				Arr.Append(VoxelDataCopy);
 				FRHIResourceCreateInfo Info(TEXT("VoxelMapVoxelData"), &Arr);
-				VoxelBuf = RHICmdList.CreateStructuredBuffer(sizeof(uint32), (uint32)(VoxelDataCopy.Num() * sizeof(uint32)), BUF_ShaderResource | BUF_Static, Info);
+				VoxelBuf = RHICmdList.CreateStructuredBuffer(sizeof(uint32), static_cast<uint32>(VoxelDataCopy.Num() * sizeof(uint32)), BUF_ShaderResource | BUF_Static, Info);
 			}
 
 			ThisPtr->BlockDataBuffer = BlockBuf;
 			ThisPtr->VoxelDataBuffer = VoxelBuf;
-			ThisPtr->BlockDataSRV = nullptr;
-			ThisPtr->VoxelDataSRV = nullptr;
-			if (BlockBuf.IsValid())
-			{
-				ThisPtr->BlockDataSRV = RHICmdList.CreateShaderResourceView(BlockBuf.GetReference());
-			}
-			if (VoxelBuf.IsValid())
-			{
-				ThisPtr->VoxelDataSRV = RHICmdList.CreateShaderResourceView(VoxelBuf.GetReference());
-			}
+			ThisPtr->BlockDataSRV = BlockBuf.IsValid() ? RHICmdList.CreateShaderResourceView(BlockBuf.GetReference()) : nullptr;
+			ThisPtr->VoxelDataSRV = VoxelBuf.IsValid() ? RHICmdList.CreateShaderResourceView(VoxelBuf.GetReference()) : nullptr;
 
-			UE_LOG(LogTemp, Log,
-				TEXT("[VoxelMap] GPU upload OK: BlockData=%d elems (%d B), VoxelData=%d elems (%d B), BlockCount=%d, VoxelCount=%d"),
-				BlockDataCopy.Num(), BlockDataCopy.Num() * (int32)sizeof(uint32),
-				VoxelDataCopy.Num(), VoxelDataCopy.Num() * (int32)sizeof(uint32),
-				BlockCount, VoxelCount);
+			UE_LOG(LogTemp, Log, TEXT("[VoxelMap] GPU upload OK: %d blocks, %d voxels"), BlockCount, VoxelCount);
 		});
 }
 
@@ -182,18 +233,15 @@ void ADS2VoxelMapRenderer::ExportRenderTargetToCSV()
 {
 	if (!RenderTarget)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Export failed: 没有 RT"));
+		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Export failed: no render target"));
 		return;
 	}
 
-	// 确保渲染线程的 pass 已执行完
 	FlushRenderingCommands();
-
-	// 游戏线程安全访问 RT 资源（GetRenderTargetResource 只能在渲染线程调用）
 	FTextureRenderTargetResource* RTResource = RenderTarget->GameThread_GetRenderTargetResource();
 	if (!RTResource)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Export failed: RT 资源未初始化"));
+		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Export failed: render target resource is unavailable"));
 		return;
 	}
 
@@ -204,43 +252,19 @@ void ADS2VoxelMapRenderer::ExportRenderTargetToCSV()
 		return;
 	}
 
-	const int32 W = RenderTarget->SizeX;
-	const int32 H = RenderTarget->SizeY;
+	const int32 Width = RenderTarget->SizeX;
+	const int32 Height = RenderTarget->SizeY;
 	FString Csv;
-	Csv.Reserve((int64)Pixels.Num() * 16);
-	for (int32 i = 0; i < Pixels.Num(); ++i)
+	Csv.Reserve(static_cast<int64>(Pixels.Num()) * 16);
+	for (int32 Index = 0; Index < Pixels.Num(); ++Index)
 	{
-		const FColor& P = Pixels[i];
-		Csv += FString::Printf(TEXT("%d,%d,%d,%d,%d\n"), i % W, i / W, P.R, P.G, P.B);
+		const FColor& Pixel = Pixels[Index];
+		Csv += FString::Printf(TEXT("%d,%d,%d,%d,%d\n"), Index % Width, Index / Width, Pixel.R, Pixel.G, Pixel.B);
 	}
 
 	const FString Path = FPaths::ProjectDir() / TEXT("rt_dump.csv");
 	if (FFileHelper::SaveStringToFile(Csv, *Path))
 	{
-		UE_LOG(LogTemp, Log, TEXT("[VoxelMap] RT 已导出: %s (%d×%d)"), *Path, W, H);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Export failed: 无法写入 %s"), *Path);
-	}
-}
-
-void ADS2VoxelMapRenderer::RegenerateVoxelMap()
-{
-	const FVoxelMapConfig Config = BuildVoxelConfig();
-	FVoxelMapGenerator::Generate(Config, VoxelMapData);
-	const bool bValid = FVoxelMapGenerator::Validate(VoxelMapData);
-
-	UE_LOG(LogTemp, Log,
-		TEXT("[VoxelMap] %dx%dx%d voxels -> %d blocks, %d occupied voxels | BlockData %d B, VoxelData %d B | Validate=%s"),
-		Config.GridSize.X, Config.GridSize.Y, Config.GridSize.Z,
-		VoxelMapData.BlockCount, VoxelMapData.OccupiedVoxelCount,
-		VoxelMapData.BlockData.Num() * (int32)sizeof(uint32),
-		VoxelMapData.VoxelData.Num() * (int32)sizeof(uint32),
-		bValid ? TEXT("OK") : TEXT("FAILED"));
-
-	if (bValid)
-	{
-		UploadVoxelMapToGPU();
+		UE_LOG(LogTemp, Log, TEXT("[VoxelMap] Exported RT: %s (%dx%d)"), *Path, Width, Height);
 	}
 }
