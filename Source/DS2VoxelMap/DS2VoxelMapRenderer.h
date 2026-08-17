@@ -11,7 +11,9 @@ class UCameraComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UVoxelMapDataAsset;
+class UVoxelMapWorldAsset;
 class FVoxelMapSceneViewExtension;
+
 
 /**
  * 运行时体素地图观察者：加载已烘焙的数据资产，使用引擎原生 DefaultPawn 输入和
@@ -28,7 +30,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Data")
 	TObjectPtr<UVoxelMapDataAsset> VoxelMapAsset;
 
+	/** 可选的分区地图清单。设置后优先于单一 VoxelMapAsset，并在加载时合并为一个稀疏 GPU 缓冲。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Data")
+	TObjectPtr<UVoxelMapWorldAsset> VoxelMapWorldAsset;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Render")
+
 	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VoxelMap|Render", meta = (ClampMin = "1", UIMin = "1"))

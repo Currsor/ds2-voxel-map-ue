@@ -22,7 +22,7 @@ struct FVoxelMapVSToPS
 	float4 Position : SV_POSITION;
 	float3 PixelWorldPos : TEXCOORD0;
 	float3 BlockWorldCenter : TEXCOORD1;
-	nointerpolation uint BlockIndex : TEXCOORD2;
+	nointerpolation uint StorageIndex : TEXCOORD2;
 };
 
 // ---- 顶点着色器（M3） ----
@@ -33,6 +33,8 @@ void MainVS(
 {
 	uint ShapeLevelAndLocation = BlockDataBuffer[InstanceID * 4 + 0];
 	uint BlockIndex = (ShapeLevelAndLocation >> 8) & 0x00FFFFFFu;
+	Output.StorageIndex = InstanceID;
+
 
 	uint BlockCountX = (uint)BlockGrid.x;
 	uint BlockCountY = (uint)BlockGrid.y;
@@ -46,9 +48,9 @@ void MainVS(
 	float3 BlockCenter = BlockMin + 0.5 * BlockSize;
 
 	Output.BlockWorldCenter = BlockCenter;
-	Output.BlockIndex = BlockIndex;
 
 	// M6：视锥剔除（block 包围球 vs 6 平面）
+
 	// UE 约定：平面距离 = dot(normal, P) - W，法线朝外，距离 > 半径 表示完全在外
 	float BlockRadius = BlockSize * 0.8660254; // sqrt(3)/2
 	bool bCulled = false;
@@ -65,8 +67,9 @@ void MainVS(
 		Output.Position = float4(0.0, 0.0, 1.0, 1.0); // 退化 quad
 		Output.PixelWorldPos = float3(0.0, 0.0, 0.0);
 		Output.BlockWorldCenter = float3(0.0, 0.0, 0.0);
-		Output.BlockIndex = 0;
+		Output.StorageIndex = 0;
 		return;
+
 	}
 
 	// billboard：沿相机 Right/Up 展开 unit quad
@@ -128,14 +131,16 @@ float3 Shade(float3 BaseColor, float3 WorldNormal)
 
 void MainPS(FVoxelMapVSToPS Input, out float4 OutColor : SV_Target0, out float OutDepth : SV_Depth)
 {
-	uint BlockIndex = Input.BlockIndex;
+	uint StorageIndex = Input.StorageIndex;
 	uint4 BlockData = uint4(
-		BlockDataBuffer[BlockIndex * 4 + 0],
-		BlockDataBuffer[BlockIndex * 4 + 1],
-		BlockDataBuffer[BlockIndex * 4 + 2],
-		BlockDataBuffer[BlockIndex * 4 + 3]);
+		BlockDataBuffer[StorageIndex * 4 + 0],
+		BlockDataBuffer[StorageIndex * 4 + 1],
+		BlockDataBuffer[StorageIndex * 4 + 2],
+		BlockDataBuffer[StorageIndex * 4 + 3]);
 
 	uint ShapeLevelAndLocation = BlockData.x;
+	uint BlockIndex = (ShapeLevelAndLocation >> 8) & 0x00FFFFFFu;
+
 	uint MaskLow = BlockData.y;
 	uint MaskHigh = BlockData.z;
 	uint RenderStartIndex = BlockData.w;

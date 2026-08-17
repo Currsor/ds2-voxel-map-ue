@@ -9,6 +9,7 @@ public class DS2VoxelMap : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
 
 		// M0: 自定义全局 shader + RDG 所需依赖
-		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "Renderer", "RHI", "Projects" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "Renderer", "RHI", "Projects", "AssetRegistry" });
+
 	}
 }

@@ -15,8 +15,12 @@
 #include "Containers/DynamicRHIResourceArray.h"
 #include "SceneViewExtension.h"
 #include "VoxelMapDataAsset.h"
+#include "VoxelMapDataBuilder.h"
 #include "VoxelMapRendering.h"
+#include "VoxelMapTypes.h"
+#include "VoxelMapWorldAsset.h"
 #include "Misc/FileHelper.h"
+
 
 ADS2VoxelMapRenderer::ADS2VoxelMapRenderer(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer
@@ -105,29 +109,109 @@ void ADS2VoxelMapRenderer::CreateRenderTarget()
 
 bool ADS2VoxelMapRenderer::ReloadVoxelMapAsset()
 {
-	if (!VoxelMapAsset)
+	if (VoxelMapWorldAsset)
 	{
-		VoxelMapData.Reset();
-		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] No VoxelMapAsset assigned; bake and assign one before play"));
-		return false;
+		TArray<FVoxelMapSourceVoxel> SourceVoxels;
+		RuntimeVoxelSize = VoxelMapWorldAsset->VoxelSize;
+		VoxelWorldOrigin = VoxelMapWorldAsset->WorldOrigin;
+		if (RuntimeVoxelSize <= UE_SMALL_NUMBER || VoxelMapWorldAsset->VoxelGridSize.GetMin() <= 0)
+		{
+			VoxelMapData.Reset();
+			UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Assigned WorldAsset has invalid global metadata"));
+			return false;
+		}
+
+		for (const FVoxelMapRegionReference& RegionReference : VoxelMapWorldAsset->Regions)
+		{
+			const UVoxelMapDataAsset* RegionAsset = RegionReference.Asset;
+			if (!RegionAsset || !FVoxelMapGenerator::Validate(RegionAsset->Data)
+				|| !FMath::IsNearlyEqual(RegionAsset->VoxelSize, RuntimeVoxelSize))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Skipping invalid or incompatible region (%d,%d,%d)"),
+					RegionReference.RegionCoordinate.X, RegionReference.RegionCoordinate.Y, RegionReference.RegionCoordinate.Z);
+				continue;
+			}
+
+			const FVoxelMapData& RegionData = RegionAsset->Data;
+			for (int32 StorageIndex = 0; StorageIndex < RegionData.BlockCount; ++StorageIndex)
+			{
+				const uint32* Block = &RegionData.BlockData[StorageIndex * 4];
+				const int32 BlockIndex = static_cast<int32>((Block[0] >> 8) & 0x00FFFFFFu);
+				const uint64 Mask = static_cast<uint64>(Block[1]) | (static_cast<uint64>(Block[2]) << 32);
+				const int32 BlockX = BlockIndex % RegionData.BlockGridSize.X;
+				const int32 BlockY = (BlockIndex / RegionData.BlockGridSize.X) % RegionData.BlockGridSize.Y;
+				const int32 BlockZ = BlockIndex / (RegionData.BlockGridSize.X * RegionData.BlockGridSize.Y);
+				int32 PackedOffset = static_cast<int32>(Block[3]);
+
+				for (int32 LocalBit = 0; LocalBit < VOXELMAP_BLOCK_VOXELS; ++LocalBit)
+
+				{
+					if ((Mask & (static_cast<uint64>(1) << LocalBit)) == 0)
+					{
+						continue;
+					}
+					if (!RegionData.VoxelData.IsValidIndex(PackedOffset))
+					{
+						VoxelMapData.Reset();
+						UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Region voxel stream is truncated"));
+						return false;
+					}
+
+					const FIntVector LocalCoordinate(
+						BlockX * VOXELMAP_BLOCK_SIZE + (LocalBit & 3),
+						BlockY * VOXELMAP_BLOCK_SIZE + ((LocalBit >> 2) & 3),
+						BlockZ * VOXELMAP_BLOCK_SIZE + ((LocalBit >> 4) & 3));
+					const FVector WorldPosition = RegionAsset->WorldOrigin + FVector(
+						static_cast<double>(LocalCoordinate.X) * RuntimeVoxelSize,
+						static_cast<double>(LocalCoordinate.Z) * RuntimeVoxelSize,
+						static_cast<double>(LocalCoordinate.Y) * RuntimeVoxelSize);
+					const FVector Relative = (WorldPosition - VoxelWorldOrigin) / RuntimeVoxelSize;
+
+					FVoxelMapSourceVoxel& SourceVoxel = SourceVoxels.AddDefaulted_GetRef();
+					SourceVoxel.Coordinate = FIntVector(
+						FMath::RoundToInt(Relative.X),
+						FMath::RoundToInt(Relative.Z),
+						FMath::RoundToInt(Relative.Y));
+					SourceVoxel.PackedData = RegionData.VoxelData[PackedOffset++];
+				}
+			}
+		}
+
+		if (!FVoxelMapDataBuilder::Build(VoxelMapWorldAsset->VoxelGridSize, SourceVoxels, VoxelMapData)
+			|| !FVoxelMapGenerator::Validate(VoxelMapData))
+		{
+			VoxelMapData.Reset();
+			UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Failed to merge WorldAsset regions"));
+			return false;
+		}
+	}
+	else
+	{
+		if (!VoxelMapAsset)
+		{
+			VoxelMapData.Reset();
+			UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] No VoxelMapAsset or VoxelMapWorldAsset assigned"));
+			return false;
+		}
+		if (!FVoxelMapGenerator::Validate(VoxelMapAsset->Data))
+		{
+			VoxelMapData.Reset();
+			UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Assigned VoxelMapAsset contains invalid data"));
+			return false;
+		}
+
+		VoxelMapData = VoxelMapAsset->Data;
+		RuntimeVoxelSize = VoxelMapAsset->VoxelSize;
+		VoxelWorldOrigin = VoxelMapAsset->WorldOrigin;
 	}
 
-	if (!FVoxelMapGenerator::Validate(VoxelMapAsset->Data))
-	{
-		VoxelMapData.Reset();
-		UE_LOG(LogTemp, Warning, TEXT("[VoxelMap] Assigned VoxelMapAsset contains invalid data"));
-		return false;
-	}
-
-	VoxelMapData = VoxelMapAsset->Data;
-	RuntimeVoxelSize = VoxelMapAsset->VoxelSize;
-	VoxelWorldOrigin = VoxelMapAsset->WorldOrigin;
 	UploadVoxelMapToGPU();
-
-	UE_LOG(LogTemp, Log, TEXT("[VoxelMap] Loaded asset: %d blocks, %d occupied voxels"),
+	UE_LOG(LogTemp, Log, TEXT("[VoxelMap] Loaded %s: %d blocks, %d occupied voxels"),
+		VoxelMapWorldAsset ? TEXT("world asset") : TEXT("asset"),
 		VoxelMapData.BlockCount, VoxelMapData.OccupiedVoxelCount);
 	return true;
 }
+
 
 void ADS2VoxelMapRenderer::SetupDisplayCamera()
 {
