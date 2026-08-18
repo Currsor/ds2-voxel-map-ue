@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08111f"/>
+      <stop offset="1" stop-color="#101b31"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#16b8d4"/>
+      <stop offset="1" stop-color="#4ce1c1"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7467f0"/>
+      <stop offset="1" stop-color="#aa77ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000814" flood-opacity="0.42"/>
+    </filter>
+    <marker id="arrowCyan" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#36d6cb"/>
+    </marker>
+    <marker id="arrowViolet" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#9a7bff"/>
+    </marker>
+    <style>
+      .t { font-family: "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif; fill: #eef6ff; }
+      .muted { fill: #91a4bd; }
+      .small { font-size: 18px; }
+      .body { font-size: 21px; }
+      .label { font-size: 20px; font-weight: 700; }
+      .code { font-family: Consolas, "Microsoft YaHei", monospace; font-size: 18px; fill: #c9dbef; }
+      .card { fill: #111f35; stroke: #29405e; stroke-width: 2; }
+      .soft { fill: #0d192b; stroke: #223a58; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <circle cx="1400" cy="90" r="260" fill="#173157" opacity="0.22"/>
+  <circle cx="100" cy="920" r="250" fill="#0e716f" opacity="0.10"/>
+
+  <text class="t" x="70" y="74" font-size="38" font-weight="800">第 5 步｜体素融合</text>
+  <text class="t muted" x="70" y="112" font-size="20">两级加权融合：先把同一视图中的多个像素压缩为一次观测，再进行跨视图汇总</text>
+  <rect x="70" y="137" width="1460" height="4" rx="2" fill="url(#cyan)" opacity="0.8"/>
+
+  <g filter="url(#shadow)">
+    <rect class="card" x="70" y="180" width="420" height="530" rx="24"/>
+    <rect class="card" x="590" y="180" width="420" height="530" rx="24"/>
+    <rect class="card" x="1110" y="180" width="420" height="530" rx="24"/>
+  </g>
+
+  <rect x="92" y="200" width="142" height="36" rx="18" fill="#153b51"/>
+  <text class="t label" x="163" y="225" text-anchor="middle" fill="#48d8d0">阶段 1</text>
+  <text class="t" x="92" y="278" font-size="28" font-weight="800">单视图内融合</text>
+  <text class="t muted small" x="92" y="310">多个像素 → 一次独立视图观测</text>
+
+  <text class="t label" x="105" y="358">视图 A 的像素样本</text>
+  <g>
+    <rect x="105" y="382" width="54" height="54" rx="10" fill="#e98a55"/>
+    <text class="t small" x="132" y="458" text-anchor="middle">0.90</text>
+    <rect x="174" y="382" width="54" height="54" rx="10" fill="#d76c62"/>
+    <text class="t small" x="201" y="458" text-anchor="middle">0.72</text>
+    <rect x="243" y="382" width="54" height="54" rx="10" fill="#9a6a8f"/>
+    <text class="t small" x="270" y="458" text-anchor="middle">0.43</text>
+    <rect x="312" y="382" width="54" height="54" rx="10" fill="#526f91"/>
+    <text class="t small" x="339" y="458" text-anchor="middle">0.21</text>
+  </g>
+  <text class="t muted" x="395" y="417" font-size="16">置信度</text>
+
+  <rect class="soft" x="94" y="492" width="372" height="128" rx="16"/>
+  <text class="t code" x="116" y="527">Σ(Color × Confidence)</text>
+  <text class="t code" x="116" y="559">ΣConfidence</text>
+  <line x1="107" y1="570" x2="453" y2="570" stroke="#2b4b6d"/>
+  <text class="t code" x="116" y="598">MaxConfidence = 0.90</text>
+
+  <line x1="490" y1="445" x2="575" y2="445" stroke="#36d6cb" stroke-width="5" marker-end="url(#arrowCyan)"/>
+  <text class="t small" x="532" y="420" text-anchor="middle" fill="#57e2d9">压缩</text>
+
+  <rect x="612" y="200" width="142" height="36" rx="18" fill="#26355e"/>
+  <text class="t label" x="683" y="225" text-anchor="middle" fill="#aa91ff">阶段 2</text>
+  <text class="t" x="612" y="278" font-size="28" font-weight="800">跨视图融合</text>
+  <text class="t muted small" x="612" y="310">每个视图只贡献一次观测计数</text>
+
+  <rect class="soft" x="614" y="343" width="372" height="102" rx="16"/>
+  <circle cx="651" cy="380" r="18" fill="#36d6cb"/>
+  <text class="t label" x="684" y="386">视图 A</text>
+  <text class="t code" x="635" y="422">AverageA × WeightA(0.90)</text>
+
+  <rect class="soft" x="614" y="463" width="372" height="102" rx="16"/>
+  <circle cx="651" cy="500" r="18" fill="#9a7bff"/>
+  <text class="t label" x="684" y="506">视图 B</text>
+  <text class="t code" x="635" y="542">AverageB × WeightB(0.75)</text>
+
+  <rect x="614" y="589" width="372" height="92" rx="16" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+  <text class="t code" x="635" y="624">GlobalColor += Average × Weight</text>
+  <text class="t code" x="635" y="656">ObservationCount += 1 / 视图</text>
+
+  <line x1="1010" y1="445" x2="1095" y2="445" stroke="#9a7bff" stroke-width="5" marker-end="url(#arrowViolet)"/>
+  <text class="t small" x="1052" y="420" text-anchor="middle" fill="#b19bff">汇总</text>
+
+  <rect x="1132" y="200" width="142" height="36" rx="18" fill="#183f45"/>
+  <text class="t label" x="1203" y="225" text-anchor="middle" fill="#70e3c7">结果</text>
+  <text class="t" x="1132" y="278" font-size="28" font-weight="800">FCaptureAccumulator</text>
+  <text class="t muted small" x="1132" y="310">同一个全局体素的累计状态</text>
+
+  <g>
+    <rect class="soft" x="1134" y="344" width="372" height="70" rx="14"/>
+    <rect x="1134" y="344" width="7" height="70" rx="3" fill="#36d6cb"/>
+    <text class="t label" x="1160" y="374">WeightedLinearColorSum</text>
+    <text class="t muted small" x="1160" y="399">各视图平均颜色的加权总和</text>
+
+    <rect class="soft" x="1134" y="426" width="372" height="70" rx="14"/>
+    <rect x="1134" y="426" width="7" height="70" rx="3" fill="#49aef2"/>
+    <text class="t label" x="1160" y="456">TotalWeight</text>
+    <text class="t muted small" x="1160" y="481">所有独立视图的权重总和</text>
+
+    <rect class="soft" x="1134" y="508" width="372" height="70" rx="14"/>
+    <rect x="1134" y="508" width="7" height="70" rx="3" fill="#9a7bff"/>
+    <text class="t label" x="1160" y="538">MaximumConfidence</text>
+    <text class="t muted small" x="1160" y="563">所有观测中的最高置信度</text>
+
+    <rect class="soft" x="1134" y="590" width="372" height="70" rx="14"/>
+    <rect x="1134" y="590" width="7" height="70" rx="3" fill="#ffba62"/>
+    <text class="t label" x="1160" y="620">ObservationCount</text>
+    <text class="t muted small" x="1160" y="645">独立视图数量，不是像素数量</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="750" width="1460" height="142" rx="24" fill="#0d192b" stroke="#29405e" stroke-width="2"/>
+  </g>
+  <text class="t label" x="98" y="790" fill="#ffca78">关键设计</text>
+  <text class="t body" x="98" y="830">即使视图 A 有 100 个像素命中、视图 B 只有 10 个像素命中，它们仍然分别只算一次独立观测。</text>
+  <text class="t body" x="98" y="865">这样可避免近距离或高分辨率视图凭借更多像素，压倒来自其他方向的有效观察。</text>
+
+  <g>
+    <text class="t muted small" x="70" y="954">入口  →  视图  →  GPU 采集  →  像素重建  →</text>
+    <rect x="548" y="922" width="150" height="46" rx="23" fill="url(#cyan)"/>
+    <text class="t label" x="623" y="953" text-anchor="middle" fill="#07151f">体素融合</text>
+    <text class="t muted small" x="716" y="954">→  清理  →  资产输出</text>
+    <text class="t muted" x="1530" y="954" text-anchor="end" font-size="15">DS2 Voxel Map · Capture Pipeline</text>
+  </g>
+</svg>

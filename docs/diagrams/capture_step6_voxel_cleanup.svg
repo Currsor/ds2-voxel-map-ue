@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08111f"/>
+      <stop offset="1" stop-color="#101b31"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#16b8d4"/>
+      <stop offset="1" stop-color="#4ce1c1"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7467f0"/>
+      <stop offset="1" stop-color="#aa77ff"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000814" flood-opacity="0.42"/>
+    </filter>
+    <marker id="arrowCyan" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#36d6cb"/>
+    </marker>
+    <style>
+      .t { font-family: "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif; fill: #eef6ff; }
+      .muted { fill: #91a4bd; }
+      .small { font-size: 17px; }
+      .body { font-size: 19px; }
+      .label { font-size: 19px; font-weight: 700; }
+      .code { font-family: Consolas, "Microsoft YaHei", monospace; font-size: 16px; fill: #c9dbef; }
+      .card { fill: #111f35; stroke: #29405e; stroke-width: 2; }
+      .soft { fill: #0d192b; stroke: #223a58; stroke-width: 1.5; }
+      .voxel { stroke: #08111f; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1100" fill="url(#bg)"/>
+  <circle cx="1430" cy="70" r="270" fill="#173157" opacity="0.22"/>
+  <circle cx="110" cy="1010" r="270" fill="#0e716f" opacity="0.10"/>
+
+  <text class="t" x="70" y="72" font-size="38" font-weight="800">第 6 步｜体素清理与拓扑修复</text>
+  <text class="t muted" x="70" y="110" font-size="20">候选体素 → 可靠性过滤 → 26 邻域飞点清理 → 保守单体素补洞 → 有效体素</text>
+  <rect x="70" y="136" width="1460" height="4" rx="2" fill="url(#cyan)" opacity="0.8"/>
+
+  <g filter="url(#shadow)">
+    <rect class="card" x="70" y="178" width="445" height="610" rx="24"/>
+    <rect class="card" x="578" y="178" width="445" height="610" rx="24"/>
+    <rect class="card" x="1086" y="178" width="444" height="610" rx="24"/>
+  </g>
+
+  <rect x="94" y="200" width="142" height="36" rx="18" fill="#153b51"/>
+  <text class="t label" x="165" y="225" text-anchor="middle" fill="#48d8d0">阶段 1</text>
+  <text class="t" x="94" y="277" font-size="27" font-weight="800">可靠性过滤</text>
+  <text class="t muted small" x="94" y="309">次数与质量，满足任一即可保留</text>
+
+  <rect class="soft" x="94" y="340" width="397" height="150" rx="16"/>
+  <text class="t code" x="116" y="374">Enough = ObservationCount ≥ 2</text>
+  <text class="t code" x="116" y="408">High = MaximumConfidence ≥ 0.75</text>
+  <line x1="116" y1="429" x2="469" y2="429" stroke="#2b4b6d"/>
+  <text class="t label" x="116" y="462" fill="#57e2d9">Enough OR High → 保留</text>
+  <text class="t small" x="116" y="483" fill="#ff8278">二者都失败或总权重无效 → 删除</text>
+
+  <g transform="translate(96 522)">
+    <rect width="187" height="102" rx="14" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+    <circle cx="34" cy="35" r="17" fill="#36d6cb"/>
+    <text class="t label" x="63" y="41">多视图确认</text>
+    <text class="t code" x="20" y="72">Count = 3</text>
+    <text class="t small" x="20" y="94" fill="#70e3c7">保留</text>
+  </g>
+  <text class="t" x="294" y="581" font-size="28" fill="#91a4bd">或</text>
+  <g transform="translate(330 522)">
+    <rect width="161" height="102" rx="14" fill="#241f41" stroke="#826ef0" stroke-width="2"/>
+    <circle cx="32" cy="35" r="17" fill="#9a7bff"/>
+    <text class="t label" x="60" y="41">单次高质</text>
+    <text class="t code" x="18" y="72">Max = 0.90</text>
+    <text class="t small" x="18" y="94" fill="#b9a6ff">保留</text>
+  </g>
+
+  <rect x="94" y="654" width="397" height="104" rx="16" fill="#211827" stroke="#7f3340" stroke-width="2"/>
+  <text class="t label" x="116" y="686" fill="#ff9d94">低次数 + 低置信度</text>
+  <text class="t code" x="116" y="716">Count = 1，Max = 0.40</text>
+  <text class="t small" x="116" y="744" fill="#ff8278">加入 KeysToRemove，遍历后统一删除</text>
+
+  <rect x="602" y="200" width="142" height="36" rx="18" fill="#26355e"/>
+  <text class="t label" x="673" y="225" text-anchor="middle" fill="#aa91ff">阶段 2</text>
+  <text class="t" x="602" y="277" font-size="27" font-weight="800">移除孤立体素</text>
+  <text class="t muted small" x="602" y="309">检查完整 3×3×3，排除中心共 26 邻域</text>
+
+  <g transform="translate(622 344)">
+    <text class="t small" x="52" y="0" text-anchor="middle">Z − 1</text>
+    <text class="t small" x="166" y="0" text-anchor="middle">Z</text>
+    <text class="t small" x="280" y="0" text-anchor="middle">Z + 1</text>
+    <g transform="translate(4 18)">
+      <rect class="voxel" x="0" y="0" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="0" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="0" width="30" height="30" rx="4" fill="#405873"/>
+      <rect class="voxel" x="0" y="34" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="34" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="34" width="30" height="30" rx="4" fill="#405873"/>
+      <rect class="voxel" x="0" y="68" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="68" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="68" width="30" height="30" rx="4" fill="#405873"/>
+    </g>
+    <g transform="translate(118 18)">
+      <rect class="voxel" x="0" y="0" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="0" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="0" width="30" height="30" rx="4" fill="#405873"/>
+      <rect class="voxel" x="0" y="34" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="34" width="30" height="30" rx="5" fill="#f59e0b" stroke="#ffca78" stroke-width="3"/><rect class="voxel" x="68" y="34" width="30" height="30" rx="4" fill="#405873"/>
+      <rect class="voxel" x="0" y="68" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="68" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="68" width="30" height="30" rx="4" fill="#405873"/>
+    </g>
+    <g transform="translate(232 18)">
+      <rect class="voxel" x="0" y="0" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="0" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="0" width="30" height="30" rx="4" fill="#405873"/>
+      <rect class="voxel" x="0" y="34" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="34" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="34" width="30" height="30" rx="4" fill="#405873"/>
+      <rect class="voxel" x="0" y="68" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="34" y="68" width="30" height="30" rx="4" fill="#405873"/><rect class="voxel" x="68" y="68" width="30" height="30" rx="4" fill="#405873"/>
+    </g>
+  </g>
+
+  <rect class="soft" x="602" y="494" width="397" height="118" rx="16"/>
+  <text class="t label" x="624" y="528">占用邻居计数</text>
+  <text class="t code" x="624" y="560">NeighborCount &lt; RequiredNeighbors</text>
+  <text class="t small" x="624" y="591" fill="#ff8278">→ 判为飞点，加入删除列表</text>
+
+  <g transform="translate(604 642)">
+    <rect width="184" height="94" rx="14" fill="#211827" stroke="#7f3340" stroke-width="2"/>
+    <g transform="translate(17 20)">
+      <rect x="0" y="0" width="18" height="18" rx="3" fill="#26394f"/><rect x="22" y="0" width="18" height="18" rx="3" fill="#26394f"/><rect x="44" y="0" width="18" height="18" rx="3" fill="#26394f"/>
+      <rect x="0" y="22" width="18" height="18" rx="3" fill="#26394f"/><rect x="22" y="22" width="18" height="18" rx="4" fill="#ef6b62"/><rect x="44" y="22" width="18" height="18" rx="3" fill="#26394f"/>
+      <rect x="0" y="44" width="18" height="18" rx="3" fill="#26394f"/><rect x="22" y="44" width="18" height="18" rx="3" fill="#26394f"/><rect x="44" y="44" width="18" height="18" rx="3" fill="#26394f"/>
+    </g>
+    <text class="t small" x="98" y="40">0 个邻居</text>
+    <text class="t label" x="98" y="70" fill="#ff8278">删除</text>
+  </g>
+  <g transform="translate(815 642)">
+    <rect width="184" height="94" rx="14" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+    <g transform="translate(17 20)">
+      <rect x="0" y="0" width="18" height="18" rx="3" fill="#26394f"/><rect x="22" y="0" width="18" height="18" rx="3" fill="#26394f"/><rect x="44" y="0" width="18" height="18" rx="3" fill="#26394f"/>
+      <rect x="0" y="22" width="18" height="18" rx="3" fill="#26394f"/><rect x="22" y="22" width="18" height="18" rx="4" fill="#36d6cb"/><rect x="44" y="22" width="18" height="18" rx="3" fill="#36d6cb"/>
+      <rect x="0" y="44" width="18" height="18" rx="3" fill="#26394f"/><rect x="22" y="44" width="18" height="18" rx="3" fill="#26394f"/><rect x="44" y="44" width="18" height="18" rx="3" fill="#26394f"/>
+    </g>
+    <text class="t small" x="98" y="40">≥ 1 个邻居</text>
+    <text class="t label" x="98" y="70" fill="#70e3c7">默认保留</text>
+  </g>
+
+  <rect x="1110" y="200" width="142" height="36" rx="18" fill="#4b3218"/>
+  <text class="t label" x="1181" y="225" text-anchor="middle" fill="#ffca78">阶段 3</text>
+  <text class="t" x="1110" y="277" font-size="27" font-weight="800">填充单体素孔洞</text>
+  <text class="t muted small" x="1110" y="309">默认关闭；只检查 6 个轴向邻居</text>
+
+  <g transform="translate(1132 352)">
+    <line x1="172" y1="20" x2="172" y2="208" stroke="#405873" stroke-width="2"/>
+    <line x1="72" y1="114" x2="272" y2="114" stroke="#405873" stroke-width="2"/>
+    <line x1="105" y1="177" x2="239" y2="50" stroke="#405873" stroke-width="2"/>
+    <rect class="voxel" x="148" y="90" width="48" height="48" rx="8" fill="#0d192b" stroke="#f59e0b" stroke-width="3" stroke-dasharray="7 5"/>
+    <text class="t label" x="172" y="121" text-anchor="middle" fill="#ffca78">空</text>
+    <rect class="voxel" x="48" y="90" width="48" height="48" rx="8" fill="#36d6cb"/>
+    <rect class="voxel" x="248" y="90" width="48" height="48" rx="8" fill="#36d6cb"/>
+    <rect class="voxel" x="148" y="0" width="48" height="48" rx="8" fill="#9a7bff"/>
+    <rect class="voxel" x="148" y="180" width="48" height="48" rx="8" fill="#9a7bff"/>
+    <rect class="voxel" x="72" y="176" width="48" height="48" rx="8" fill="#405873" opacity="0.35"/>
+    <rect class="voxel" x="224" y="32" width="48" height="48" rx="8" fill="#405873" opacity="0.35"/>
+    <text class="t small" x="28" y="119" text-anchor="end" fill="#57e2d9">−X</text>
+    <text class="t small" x="316" y="119" fill="#57e2d9">+X</text>
+    <text class="t small" x="172" y="-12" text-anchor="middle" fill="#b9a6ff">+Y</text>
+    <text class="t small" x="172" y="252" text-anchor="middle" fill="#b9a6ff">−Y</text>
+  </g>
+
+  <rect class="soft" x="1110" y="618" width="396" height="140" rx="16"/>
+  <text class="t label" x="1132" y="650">对向轴判定</text>
+  <text class="t code" x="1132" y="680">X: +X 与 −X 都占用 → +1</text>
+  <text class="t code" x="1132" y="706">Y: +Y 与 −Y 都占用 → +1</text>
+  <text class="t small" x="1132" y="740" fill="#ffca78">OpposingAxes ≥ 2 → 用最多 6 邻居均色填充</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="826" width="1460" height="164" rx="24" fill="#0d192b" stroke="#29405e" stroke-width="2"/>
+  </g>
+  <text class="t label" x="98" y="866" fill="#ffca78">为什么必须按这个顺序？</text>
+  <rect x="98" y="891" width="250" height="58" rx="14" fill="#153b51" stroke="#2aaea8"/>
+  <text class="t label" x="223" y="926" text-anchor="middle">先删低可信体素</text>
+  <line x1="358" y1="920" x2="430" y2="920" stroke="#36d6cb" stroke-width="4" marker-end="url(#arrowCyan)"/>
+  <rect x="450" y="891" width="250" height="58" rx="14" fill="#26355e" stroke="#826ef0"/>
+  <text class="t label" x="575" y="926" text-anchor="middle">再删孤立飞点</text>
+  <line x1="710" y1="920" x2="782" y2="920" stroke="#36d6cb" stroke-width="4" marker-end="url(#arrowCyan)"/>
+  <rect x="802" y="891" width="250" height="58" rx="14" fill="#4b3218" stroke="#d68125"/>
+  <text class="t label" x="927" y="926" text-anchor="middle">最后保守补洞</text>
+  <line x1="1062" y1="920" x2="1134" y2="920" stroke="#36d6cb" stroke-width="4" marker-end="url(#arrowCyan)"/>
+  <rect x="1154" y="891" width="344" height="58" rx="14" fill="#102b35" stroke="#2aaea8"/>
+  <text class="t label" x="1326" y="916" text-anchor="middle">全部先收集、后统一修改</text>
+  <text class="t small" x="1326" y="940" text-anchor="middle" fill="#70e3c7">避免连锁删除与补洞扩张</text>
+
+  <g>
+    <text class="t muted small" x="70" y="1052">入口  →  视图  →  GPU 采集  →  像素重建  →  体素融合  →</text>
+    <rect x="700" y="1020" width="140" height="46" rx="23" fill="url(#amber)"/>
+    <text class="t label" x="770" y="1051" text-anchor="middle" fill="#1d1205">清理</text>
+    <text class="t muted small" x="858" y="1052">→  资产输出</text>
+    <text class="t muted" x="1530" y="1052" text-anchor="end" font-size="15">DS2 Voxel Map · Capture Pipeline</text>
+  </g>
+</svg>

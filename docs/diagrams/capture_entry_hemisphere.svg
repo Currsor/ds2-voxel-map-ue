@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#eef2ff"/></linearGradient>
+    <marker id="arrowBlue" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#2563eb"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-opacity=".12"/></filter>
+  </defs>
+  <rect width="1200" height="680" rx="24" fill="url(#bg)"/>
+  <text x="48" y="58" font-family="Microsoft YaHei, sans-serif" font-size="30" font-weight="700" fill="#0f172a">入口 2 · 半球采集</text>
+  <text x="48" y="92" font-family="Microsoft YaHei, sans-serif" font-size="17" fill="#475569">Fibonacci 上半球分布 · 多个透视视图共同覆盖外部可见表面</text>
+  <rect x="58" y="122" width="1084" height="480" rx="18" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <rect x="300" y="244" width="600" height="280" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="2" stroke-dasharray="8 7"/>
+  <text x="316" y="274" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="600" fill="#475569">CaptureBounds</text>
+  <path d="M365 474 C430 395 475 454 530 360 C580 277 633 351 676 414 C718 474 780 365 850 460 L850 524 L365 524 Z" fill="#dbeafe" stroke="#64748b" stroke-width="3"/>
+  <path d="M365 474 C430 395 475 454 530 360 C580 277 633 351 676 414 C718 474 780 365 850 460" fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round"/>
+  <path d="M220 450 A380 310 0 0 1 980 450" fill="none" stroke="#93c5fd" stroke-width="3" stroke-dasharray="9 8"/>
+  <g fill="#2563eb" stroke="#fff" stroke-width="3">
+    <circle cx="228" cy="420" r="13"/><circle cx="300" cy="265" r="13"/><circle cx="430" cy="174" r="13"/>
+    <circle cx="600" cy="140" r="13"/><circle cx="770" cy="174" r="13"/><circle cx="900" cy="265" r="13"/><circle cx="972" cy="420" r="13"/>
+  </g>
+  <g stroke="#2563eb" stroke-width="3" marker-end="url(#arrowBlue)" opacity=".9">
+    <path d="M244 421 L527 381"/><path d="M313 276 L538 353"/><path d="M441 187 L565 334"/>
+    <path d="M600 157 L600 318"/><path d="M759 187 L635 343"/><path d="M887 276 L673 392"/><path d="M956 421 L697 421"/>
+  </g>
+  <circle cx="600" cy="405" r="6" fill="#0f172a"/>
+  <text x="615" y="403" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#334155">所有相机朝向 Bounds 中心</text>
+  <text x="779" y="147" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="600" fill="#1d4ed8">蓝点：Fibonacci 采样位置</text>
+  <path d="M675 414 C718 474 780 365 850 460" fill="none" stroke="#94a3b8" stroke-width="7" stroke-dasharray="11 9" stroke-linecap="round"/>
+  <path d="M516 360 C560 292 605 325 642 370" fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round"/>
+  <rect x="82" y="548" width="18" height="6" rx="3" fill="#f97316"/><text x="109" y="557" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#334155">至少一个视图直接可见</text>
+  <line x1="316" y1="551" x2="340" y2="551" stroke="#94a3b8" stroke-width="5" stroke-dasharray="7 5"/><text x="350" y="557" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#334155">深层遮挡仍可能缺失</text>
+  <text x="773" y="557" font-family="Consolas, monospace" font-size="14" fill="#475569">World Z ≥ 0</text>
+  <rect x="58" y="618" width="1084" height="44" rx="10" fill="#eff6ff"/>
+  <text x="80" y="646" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#1e40af">输出：N 个透视视图统一融合；视图更多可提升外表面覆盖，但不能保证洞穴和内部结构完整。</text>
+</svg>

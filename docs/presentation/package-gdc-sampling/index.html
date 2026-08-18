@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="按照死亡搁浅 2 GDC 演讲顺序整理的地图采样技术演示">
+  <title>死亡搁浅 2：从世界到 Point Grid</title>
+  <link rel="stylesheet" href="./voxel-capture-deck.css">
+  <link rel="stylesheet" href="./gdc-sampling.css">
+</head>
+<body>
+  <div class="progress" aria-hidden="true"></div>
+  <main class="deck" aria-live="polite">
+    <section class="slide hero active" data-title="封面" aria-hidden="false">
+      <div class="slide-body animate">
+        <div class="hero-mark"><i></i><b>DEATH STRANDING 2 · VOXEL 3D UI MAP</b></div>
+        <p class="eyebrow">PART 01 · MAP SAMPLING</p>
+        <h1>从游戏世界到<br><span>Point Grid</span></h1>
+        <p class="lead">按照 GDC 演讲的原始顺序，拆解《死亡搁浅 2》如何获取地图 3D 数据，以及我们在 UE 中如何复现这条采样路径。</p>
+        <div class="hero-chips"><span class="chip">设计需求</span><span class="chip">方案选择</span><span class="chip">Hemisphere Pass</span><span class="chip">XYZ Slice Pass</span><span class="chip">Point Grid</span></div>
+      </div>
+      <div class="slide-foot"><span>本篇仅讨论地图采样，不进入体素渲染</span><span class="gdc-source">Making of Voxel 3D UI Map</span></div>
+    </section>
+
+    <section class="slide" data-title="设计起点" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">01 · DESIGN CONTEXT</p><h2>从“可以倾斜的 2D 地图”开始</h2></div><span class="slide-no">02 / 13</span></header>
+      <div class="slide-body">
+        <div class="story-bridge animate">
+          <article class="story-card">
+            <div class="source-window map"><img src="./assets/gdc/ds1-map.png" alt="死亡搁浅第一代 UI 地图"><span class="image-caption">Death Stranding · 2019</span></div>
+            <h3>第一代：高度图 + 视差</h3>
+            <p class="muted">缩远时平滑、信息明确；靠近后会暴露高度图分辨率，桥下、悬挑与垂直结构也无法真正成立。</p>
+          </article>
+          <div class="flow-arrow"></div>
+          <article class="story-card">
+            <div class="source-window map"><img src="./assets/gdc/ds2-map.png" alt="死亡搁浅 2 三维 UI 地图"><span class="image-caption">Death Stranding 2 · Ring Terminal</span></div>
+            <h3>第二代：完整 3D 地图</h3>
+            <p class="muted">地图不再只是带纵深感的平面，而要让玩家直接读出陡坡、死胡同和复杂建筑空间。</p>
+          </article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>问题不是“让地图更立体”，而是“让地图拥有真实空间结构”</span><span>GDC 03–05</span></footer>
+    </section>
+
+    <section class="slide" data-title="设计需求" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">02 · REQUIREMENTS</p><h2>四个要求共同限定技术路线</h2></div><span class="slide-no">03 / 13</span></header>
+      <div class="slide-body requirements-layout">
+        <div class="requirements-visual animate">
+          <div class="map-generation" data-label="DS1 · HEIGHT MAP"><img src="./assets/gdc/ds1-map.png" alt="第一代高度图地图"></div>
+          <div class="map-generation" data-label="DS2 · FULL 3D"><img src="./assets/gdc/ds2-map.png" alt="第二代全三维地图"></div>
+        </div>
+        <div class="requirement-list animate">
+          <article class="requirement" data-no="01"><h3>必须是全三维</h3><p>玩家需要从地图直接判断陡坡、断崖、死胡同和建筑空间。</p></article>
+          <article class="requirement" data-no="02"><h3>不能增加美术工作量</h3><p>地图数据应从最终游戏世界自动获得，而不是再制作一套地图专用资产。</p></article>
+          <article class="requirement" data-no="03"><h3>内存与加载必须轻量</h3><p>地图叠加在现有世界资源之上，必须保持较小体积并支持快速加载。</p></article>
+          <article class="requirement" data-no="04"><h3>符合帧时间预算</h3><p>缩放与导航不能引发卡顿，渲染成本必须与游戏其余系统共存。</p></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>采样部分首先解决前 3 项：3D 数据、自动生产、紧凑表达</span><span>GDC Requirement</span></footer>
+    </section>
+
+    <section class="slide" data-title="目标形态" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">03 · TARGET EXPERIENCE</p><h2>远看是世界，近看是体素化几何</h2></div><span class="slide-no">04 / 13</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">视角拉远，保留完整世界的自然全貌；视角拉近，逐渐看见构成世界的离散几何。</p>
+          <div class="grid-2">
+            <article class="card win"><span class="num">FAR</span><h3>整体可读性</h3><p class="muted">地形、路线、设施和区域边界共同服务导航决策。</p></article>
+            <article class="card choice"><span class="num">NEAR</span><h3>三维结构感</h3><p class="muted">山脊、桥梁、峡谷和建筑不再被压扁到单一高度层。</p></article>
+          </div>
+          <p class="callout" style="margin-top:18px">为了得到这种地图，第一步不是决定“怎么画体素”，而是决定“如何从最终世界获得足够完整的 3D 数据”。</p>
+        </div>
+        <div class="source-window map" style="height:min(60vh,560px)"><img src="./assets/gdc/ds2-map.png" alt="死亡搁浅 2 UI 三维地图"><span class="image-caption">目标结果：可缩放的完整 3D 世界地图</span></div>
+      </div>
+      <footer class="slide-foot"><span>Getting 3D Data From The World</span><span>GDC 05–06</span></footer>
+    </section>
+
+    <section class="slide" data-title="获取方案" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">04 · OPTIONS</p><h2>获取 3D 数据：依次尝试三条路线</h2></div><span class="slide-no">05 / 13</span></header>
+      <div class="slide-body animate">
+        <div class="decision-list">
+          <article class="decision-card rejected"><span class="decision-mark">×</span><h3>高度图重建</h3><p>从 Height + Color 的俯视投影恢复三维地形。</p><strong>简单地形有效，但无法表达多层空间。</strong></article>
+          <article class="decision-card rejected"><span class="decision-mark">×</span><h3>导出实例几何</h3><p>直接导出游戏世界中已放置的 Mesh 实例。</p><strong>几何精确，但拿不到最终着色结果。</strong></article>
+          <article class="decision-card selected"><span class="decision-mark">✓</span><h3>烘焙点云</h3><p>从多个摄像机视角渲染世界区块，并由 G-buffer 生成三维点。</p><strong>同时获得空间、颜色和其他表面信息。</strong></article>
+        </div>
+        <p class="callout" style="margin-top:20px"><b>决策标准：</b>不仅要有几何，还要自动反映游戏中最终可见的材质混合、贴花和环境状态。</p>
+      </div>
+      <footer class="slide-foot"><span>Height Map × · Export Geometry × · Bake Point Cloud ✓</span><span>GDC 07–09</span></footer>
+    </section>
+
+    <section class="slide" data-title="高度图重建" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">05 · ATTEMPT A</p><h2>高度图重建：适合占位，不适合作为最终数据</h2></div><span class="slide-no">06 / 13</span></header>
+      <div class="slide-body method-layout">
+        <div class="source-window method"><img src="./assets/gdc/height-comparison.png" alt="高度图重建的游戏画面与结果对比"><span class="image-caption">Game View ↔ Height + Color Map</span></div>
+        <div class="method-copy animate">
+          <span class="verdict">× REJECTED</span>
+          <h3>单值高度无法表达多层空间</h3>
+          <p>对普通地表，它简单、稳定、生成快速；但同一个平面位置只能保存一个高度。</p>
+          <div class="why"><b>因此会丢失：</b><br>桥下空间、洞穴、悬挑、建筑内部，以及上下重叠的复杂结构。</div>
+          <p class="muted" style="margin-top:16px">GDC 中仍将它保留为正式体素地图完成前的临时占位方案。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>优点：便宜、快速 · 限制：2.5D</span><span>GDC 07</span></footer>
+    </section>
+
+    <section class="slide" data-title="导出几何" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">06 · ATTEMPT B</p><h2>导出实例几何：几何正确，但不是最终世界</h2></div><span class="slide-no">07 / 13</span></header>
+      <div class="slide-body method-layout">
+        <div class="source-window method"><img src="./assets/gdc/asset-comparison.png" alt="岩石资产与高山最终着色结果对比"><span class="image-caption">Rocks Asset ↔ Positioned High On A Mountain</span></div>
+        <div class="method-copy animate">
+          <span class="verdict">× REJECTED</span>
+          <h3>资产本体不等于最终像素</h3>
+          <p>导出 Mesh 可以得到非常精确的几何，但它绕过了游戏运行时的最终材质组合。</p>
+          <div class="why"><b>缺少的信息包括：</b><br>混合纹理、贴花、地形融合、积雪过渡，以及依赖世界状态的着色结果。</div>
+          <p class="muted" style="margin-top:16px">图中的同一岩石被放到高山后，最终世界会出现积雪；仅导出原资产无法得到这层结果。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Placed Asset ≠ Final Shaded World</span><span>GDC 08</span></footer>
+    </section>
+
+    <section class="slide" data-title="烘焙点云" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">07 · FINAL CHOICE</p><h2>最终方案：从最终渲染结果烘焙点云</h2></div><span class="slide-no">08 / 13</span></header>
+      <div class="slide-body cloud-result">
+        <div class="source-window cloud"><img src="./assets/gdc/baked-point-cloud.png" alt="死亡搁浅 2 烘焙点云结果"><span class="image-caption">Bake Point Cloud ✓</span></div>
+        <div class="signal-stack animate">
+          <span class="verdict ok" style="justify-self:start">✓ SELECTED</span>
+          <article class="signal-card geometry"><b>多摄像机覆盖世界区块</b><span>从不同方向渲染，避免把世界限制成单一俯视表面。</span></article>
+          <article class="signal-card surface"><b>从 G-buffer 生成 3D 点</b><span>每个有效像素提供世界空间位置、最终颜色和其他表面数值。</span></article>
+          <article class="signal-card water"><b>补充物理引擎数据</b><span>GDC 方案额外采样水体信息；演讲图中蓝色区域代表水。</span></article>
+          <p class="callout">这条路线同时满足：真实三维、无需额外美术资产、可继续压缩。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Render World Chunks → Read G-buffer → Build 3D Points</span><span>GDC 09</span></footer>
+    </section>
+
+    <section class="slide" data-title="采样全流程" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">08 · CAPTURE PROCESS</p><h2>采样过程分为三个连续阶段</h2></div><span class="slide-no">09 / 13</span></header>
+      <div class="slide-body animate">
+        <div class="capture-three">
+          <article class="capture-phase"><span class="phase-no">01</span><h3>Hemisphere Pass</h3><div class="phase-visual"><div class="hemisphere-mini"><div class="orbit"></div><div class="terrain"></div><i class="camera-dot a"></i><i class="camera-dot b"></i><i class="camera-dot c"></i><i class="camera-dot d"></i><i class="camera-dot e"></i></div></div><p>在区块上方半球均匀放置摄像机，覆盖主要外部表面。</p></article>
+          <article class="capture-phase"><span class="phase-no">02</span><h3>XYZ Slice Pass</h3><div class="phase-visual"><div class="slice-mini"><div class="terrain"></div><i></i><i></i><i></i><i></i></div></div><p>摄像机沿三个坐标轴穿过区块，补足桥下、峡谷和建筑内部。</p></article>
+          <article class="capture-phase"><span class="phase-no">03</span><h3>Point Cloud → Grid</h3><div class="phase-visual"><div class="point-grid-mini"><i style="left:8%;top:76%"></i><i style="left:18%;top:65%"></i><i style="left:27%;top:73%"></i><i style="left:36%;top:49%"></i><i style="left:45%;top:16%"></i><i style="left:53%;top:45%"></i><i style="left:62%;top:58%"></i><i style="left:72%;top:39%"></i><i style="left:82%;top:72%"></i><i style="left:14%;top:86%"></i><i style="left:31%;top:84%"></i><i style="left:48%;top:64%"></i><i style="left:65%;top:77%"></i><i style="left:88%;top:83%"></i></div></div><p>将浮点点云量化为区块包围盒内的整数索引，并合并重复位置。</p></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Hemisphere Pass → XYZ Slice Pass → Point Grid</span><span>GDC 10</span></footer>
+    </section>
+
+    <section class="slide" data-title="半球采样" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">09 · HEMISPHERE PASS</p><h2>第一阶段：像摄影一样覆盖外部表面</h2></div><span class="slide-no">10 / 13</span></header>
+      <div class="slide-body pass-focus">
+        <div class="visual-frame" role="img" aria-label="区块上方半球均匀分布多个摄像机">
+          <div class="visual-label"><span>Uniform camera distribution</span><span>Outer surface coverage</span></div>
+          <div class="capture-scene" style="transform:scale(1.45);margin-top:30px"><div class="orbit"></div><i class="camera-dot a"></i><i class="camera-dot b"></i><i class="camera-dot c"></i><i class="camera-dot d"></i><i class="camera-dot e"></i><div class="capture-bounds"></div><div class="axis"><i class="x">X</i><i class="y">Y</i><i class="z">Z</i></div></div>
+        </div>
+        <div class="pass-notes animate">
+          <article class="pass-note gdc"><b>GDC 原始描述</b><span>多个摄像机均匀分布在世界区块上方的半球区域，渲染多张画面。</span></article>
+          <article class="pass-note project"><b>我们的 UE 对应实现</b><span><span class="mono">BakeHemisphereCapture</span> 使用 Fibonacci Hemisphere 生成稳定、均匀的视图方向。</span></article>
+          <article class="pass-note project"><b>每个视图采什么</b><span><span class="mono">SceneDepth</span> 用于重建空间位置，<span class="mono">BaseColor</span> 提供不带光照的表面颜色。</span></article>
+          <article class="pass-note"><b>能力边界</b><span>适合地形和建筑外表面；仍会漏掉被上层结构遮挡的空间，因此必须进入 Slice Pass。</span></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>公开资料确认“均匀半球”；具体视角数属于工程复原参数</span><span>Pass 01</span></footer>
+    </section>
+
+    <section class="slide" data-title="切片采样" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">10 · XYZ SLICE PASS</p><h2>第二阶段：让摄像机穿过区块内部</h2></div><span class="slide-no">11 / 13</span></header>
+      <div class="slide-body pass-focus">
+        <div class="visual-frame" role="img" aria-label="沿 X Y Z 三轴逐层进行正交切片采样">
+          <div class="visual-label"><span>Axis-aligned sweep</span><span>Occluded space recovery</span></div>
+          <div class="job-builder" style="grid-template-columns:.75fr 34px 1.25fr">
+            <div class="capture-scene" style="transform:scale(.95)"><div class="slab"></div><div class="capture-bounds"></div><div class="axis"><i class="x">X</i><i class="y">Y</i><i class="z">Z</i></div></div>
+            <div class="flow-arrow"></div>
+            <div class="job-stack"><div class="job-row slice"><span class="type">X</span><b>Slice 01 → N</b><span>ORTHO</span></div><div class="job-row slice"><span class="type">Y</span><b>Slice 02 → N</b><span>ORTHO</span></div><div class="job-row slice"><span class="type">Z</span><b>Slice 03 → N</b><span>ORTHO</span></div><div class="node violet"><b>Bridge / Canyon / Interior</b><small>半球视图无法覆盖的数据</small></div></div>
+          </div>
+        </div>
+        <div class="pass-notes animate">
+          <article class="pass-note gdc"><b>GDC 原始描述</b><span>沿每个坐标轴移动摄像机并渲染切片，用于捕捉桥下、峡谷内部和建筑内部。</span></article>
+          <article class="pass-note project"><b>我们的 UE 对应实现</b><span><span class="mono">BakeXYZSliceCapture</span> 使用三轴正交相机，并只接受当前 Slab 范围内的重建点。</span></article>
+          <article class="pass-note project"><b>为何限定 Slab</b><span>如果正交视图接受射线上的所有表面，同一视图仍会被最近遮挡面主导；薄层约束让采样空间逐层推进。</span></article>
+          <article class="pass-note"><b>与半球互补</b><span>Hemisphere 提供更自然的外表面结果；Slice 专门提高内部与遮挡区域覆盖。</span></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>沿 X / Y / Z 穿过区块，而不是只从区块外部观看</span><span>Pass 02</span></footer>
+    </section>
+
+    <section class="slide" data-title="像素转三维点" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">11 · G-BUFFER TO POINTS</p><h2>每张渲染结果如何变成三维点</h2></div><span class="slide-no">12 / 13</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">GDC 给出的是原则：从 G-buffer 生成 3D 点。我们的实现将它拆成可验证的五步。</p>
+          <div class="formula">Pixel + SceneDepth + Camera<br>→ World Position<br>→ Bounds / Slab Test<br>→ Grid Coordinate</div>
+          <div class="point-contract">
+            <div class="contract-item"><b>POSITION</b><span>由深度与相机投影反算世界位置</span></div>
+            <div class="contract-item"><b>COLOR</b><span>从 BaseColor 获取表面颜色</span></div>
+            <div class="contract-item"><b>SOURCE</b><span>记录 Hemisphere 或 Slice 来源</span></div>
+            <div class="contract-item"><b>WEIGHT</b><span>工程实现附加置信度用于融合</span></div>
+          </div>
+          <p class="callout" style="margin-top:17px">物理水体采样属于 GDC 原方案；当前项目主线先完成几何与颜色采集，水体可作为独立数据通道扩展。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="像素深度反投影到世界空间并量化到网格">
+          <div class="visual-label"><span>Rendered pixels</span><span>3D observations</span></div>
+          <div class="reconstruct">
+            <div class="recon-step"><div class="pixel-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><b>像素</b><small>Depth + Color</small></div>
+            <div class="recon-step"><div class="ray-sketch"><i></i></div><b>反投影</b><small>Camera Projection</small></div>
+            <div class="recon-step"><div class="world-point"></div><b>世界点</b><small>World Position</small></div>
+            <div class="recon-step"><div class="confidence-gauge"></div><b>筛选</b><small>Bounds / Slab</small></div>
+            <div class="recon-step"><div class="voxel-cube"></div><b>网格坐标</b><small>Integer Index</small></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>G-buffer Sample → World-space Point</span><span>Reconstruction</span></footer>
+    </section>
+
+    <section class="slide" data-title="Point Grid" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">12 · POINT GRID</p><h2>第三阶段：把浮点点云压缩成 Point Grid</h2></div><span class="slide-no">13 / 13</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">不再保存每个点的浮点世界坐标，而是记录它在区块 Bounding Box 内的整数索引。</p>
+          <div class="formula">GridIndex = floor((WorldPosition − Bounds.Min) / CellSize)<br>Color[index] = Average(All colors at index)</div>
+          <ul><li>多个观测落到同一整数位置时合并为一个格点。</li><li>同一位置的颜色由全部颜色求平均。</li><li>GDC 明确提出：发生冲突时优先采用 Hemisphere Pass，而非 Slice Pass。</li><li>精度有所下降，但数据尺寸显著降低，并足以满足地图表现。</li></ul>
+        </div>
+        <div class="visual-frame" role="img" aria-label="半球与切片观测量化为整数网格并融合颜色">
+          <div class="visual-label"><span>Point observations</span><span>Integer Point Grid</span></div>
+          <div class="priority-merge">
+            <div class="observation-stack"><div class="observation">H · P(12.4, 8.1, 6.7)</div><div class="observation">H · P(12.2, 8.3, 6.8)</div><div class="observation slice">S · P(12.1, 8.0, 6.6)</div><div class="observation slice">S · P(15.8, 8.2, 7.0)</div></div>
+            <div class="flow-arrow"></div>
+            <div class="grid-index"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="hit"></i><i></i><i></i><i></i><i class="mix"></i><i class="hit"></i><i></i><i></i><i></i><i></i><i class="hit"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="flow-arrow"></div>
+            <div class="average-result"><b>Point Grid</b><span>Integer Position<br>Average Color<br>Hemisphere Priority</span></div>
+          </div>
+          <div class="grid-3" style="margin-top:28px"><article class="card win"><h3>更小</h3><p class="muted">整数索引替代浮点坐标。</p></article><article class="card win"><h3>更稳定</h3><p class="muted">重复观测合并到固定位置。</p></article><article class="card choice"><h3>可继续处理</h3><p class="muted">为后续体素化与渲染准备统一输入。</p></article></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>地图采样部分到此结束 · 下一部分：Point Grid 如何进入体素渲染</span><span>GDC 10</span></footer>
+    </section>
+  </main>
+
+  <nav class="nav" aria-label="幻灯片导航"><button data-prev title="上一页（←）" aria-label="上一页">←</button><span class="counter"><span data-current>01</span> / <span data-total>13</span></span><button data-next title="下一页（→）" aria-label="下一页">→</button><button data-fullscreen title="全屏（F）" aria-label="全屏">⛶</button></nav>
+  <div class="hint">← → 翻页 · F 全屏 · P 打印/PDF</div>
+  <script src="./voxel-capture-deck.js"></script>
+</body>
+</html>

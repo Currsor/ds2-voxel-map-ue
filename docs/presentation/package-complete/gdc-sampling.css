@@ -1,0 +1,320 @@
+.gdc-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255,255,255,.76);
+  font: 700 11px/1 "Cascadia Code", Consolas, monospace;
+  letter-spacing: .05em;
+}
+
+.gdc-source::before {
+  content: "GDC";
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: #fff;
+  background: var(--slate);
+  font-size: 9px;
+}
+
+.source-window {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #1f2226;
+  box-shadow: var(--shadow);
+}
+
+.source-window img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.source-window.map img { object-position: 50% 47%; }
+.source-window.method img,
+.source-window.cloud img {
+  object-fit: contain;
+  object-position: center;
+}
+.source-window.process img { object-position: 50% 46%; }
+
+.image-caption {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(18,24,32,.78);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+}
+
+.requirements-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.requirements-visual {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 12px;
+  min-height: 510px;
+}
+
+.map-generation {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: #111923;
+}
+
+.map-generation img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 47%;
+  opacity: .88;
+}
+
+.map-generation::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(15,23,42,.76);
+  font: 700 11px "Cascadia Code", Consolas, monospace;
+}
+
+.requirement-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.requirement {
+  position: relative;
+  padding: 21px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,.88);
+  box-shadow: var(--shadow-soft);
+}
+
+.requirement::before {
+  content: attr(data-no);
+  display: block;
+  margin-bottom: 10px;
+  color: var(--teal);
+  font: 800 26px/1 "Cascadia Code", Consolas, monospace;
+}
+
+.requirement h3 { margin-bottom: 7px; font-size: 18px; }
+.requirement p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+.story-bridge {
+  display: grid;
+  grid-template-columns: .82fr 54px 1.18fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.story-card {
+  min-height: 380px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255,255,255,.88);
+  box-shadow: var(--shadow-soft);
+}
+
+.story-card h3 { font-size: 25px; }
+.story-card .source-window { height: 220px; margin-bottom: 18px; }
+
+.decision-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.decision-card {
+  position: relative;
+  min-height: 350px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: rgba(255,255,255,.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.decision-card.rejected { border-top: 5px solid var(--red); }
+.decision-card.selected { border-top: 5px solid var(--green); }
+.decision-card .decision-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--red);
+  font-weight: 800;
+}
+.decision-card.selected .decision-mark { background: var(--green); }
+.decision-card p { color: var(--muted); font-size: 15px; }
+.decision-card strong { display: block; margin-top: 14px; color: var(--ink-soft); }
+
+.method-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, .78fr);
+  gap: 24px;
+  min-height: 0;
+}
+
+.method-layout .source-window {
+  min-height: 0;
+  aspect-ratio: 1403 / 552;
+  align-self: center;
+}
+.method-copy { display: flex; flex-direction: column; justify-content: center; }
+.method-copy .verdict {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: var(--red);
+  background: var(--red-soft);
+  font-weight: 800;
+}
+.method-copy .verdict.ok { color: var(--green); background: var(--green-soft); }
+.method-copy h3 { font-size: 29px; }
+.method-copy p { color: var(--ink-soft); }
+.method-copy .why { margin-top: 14px; padding: 15px 17px; border-left: 4px solid var(--amber); background: var(--amber-soft); border-radius: 0 12px 12px 0; }
+
+.cloud-result {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(0,.8fr);
+  gap: 24px;
+  min-height: 0;
+}
+.cloud-result .source-window {
+  min-height: 0;
+  aspect-ratio: 996 / 609;
+  align-self: center;
+}
+.signal-stack { display: grid; gap: 13px; align-content: center; }
+.signal-card { padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: #fff; box-shadow: var(--shadow-soft); }
+.signal-card b { display: block; margin-bottom: 6px; }
+.signal-card span { color: var(--muted); font-size: 14px; }
+.signal-card.geometry { border-left: 5px solid var(--blue); }
+.signal-card.surface { border-left: 5px solid var(--teal); }
+.signal-card.water { border-left: 5px solid #0891b2; }
+
+.capture-three {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 16px;
+}
+.capture-phase {
+  position: relative;
+  min-height: 370px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: rgba(255,255,255,.9);
+  box-shadow: var(--shadow-soft);
+}
+.capture-phase:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  right: -17px;
+  top: 46%;
+  z-index: 2;
+  color: var(--teal);
+  font-size: 24px;
+  font-weight: 900;
+}
+.phase-no { display: block; margin-bottom: 13px; color: var(--teal); font: 800 30px/1 "Cascadia Code", monospace; }
+.capture-phase h3 { font-size: 22px; }
+.capture-phase p { color: var(--muted); font-size: 14px; }
+.phase-visual { height: 185px; margin: 18px 0; display: grid; place-items: center; border-radius: 14px; background: #eef2f3; overflow: hidden; }
+
+.hemisphere-mini { position: relative; width: 210px; height: 150px; }
+.hemisphere-mini .terrain { position: absolute; left: 30px; bottom: 15px; width: 150px; height: 65px; background: linear-gradient(155deg, transparent 0 24%, #697765 25% 45%, #465d5a 46% 64%, #82918a 65%); clip-path: polygon(0 100%,10% 60%,30% 66%,46% 12%,65% 48%,77% 30%,100% 100%); }
+.hemisphere-mini .orbit { left: 9px; top: 4px; width: 192px; height: 115px; }
+.hemisphere-mini .camera-dot.a { left: 3px; top: 85px; }.hemisphere-mini .camera-dot.b { left: 36px; top: 28px; }.hemisphere-mini .camera-dot.c { left: 95px; top: 2px; }.hemisphere-mini .camera-dot.d { right: 30px; top: 28px; }.hemisphere-mini .camera-dot.e { right: 3px; top: 85px; }
+
+.slice-mini { position: relative; width: 210px; height: 150px; }
+.slice-mini .terrain { position: absolute; inset: 45px 24px 18px; background: #536963; clip-path: polygon(0 100%,12% 50%,35% 60%,49% 5%,67% 58%,84% 37%,100% 100%); }
+.slice-mini i { position: absolute; top: 16px; width: 4px; height: 118px; background: var(--violet); opacity: .7; }
+.slice-mini i:nth-child(2) { left: 53px; }.slice-mini i:nth-child(3) { left: 89px; }.slice-mini i:nth-child(4) { left: 125px; }.slice-mini i:nth-child(5) { left: 161px; }
+
+.point-grid-mini { position: relative; width: 180px; height: 150px; transform: perspective(300px) rotateX(58deg) rotateZ(-22deg); }
+.point-grid-mini i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--teal); }
+.point-grid-mini i:nth-child(3n) { background: var(--slate); }
+
+.pass-focus {
+  display: grid;
+  grid-template-columns: minmax(0,.88fr) minmax(0,1.12fr);
+  gap: 24px;
+  align-items: center;
+}
+.pass-notes { display: grid; gap: 13px; }
+.pass-note { padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.88); }
+.pass-note b { display: block; margin-bottom: 6px; }
+.pass-note span { color: var(--muted); font-size: 14px; }
+.pass-note.project { border-left: 5px solid var(--teal); }
+.pass-note.gdc { border-left: 5px solid var(--slate); }
+
+.point-contract {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+.contract-item { padding: 14px; border-radius: 13px; border: 1px solid var(--line); background: #fff; }
+.contract-item b { display: block; margin-bottom: 5px; color: var(--teal); font: 800 13px "Cascadia Code", monospace; }
+.contract-item span { color: var(--muted); font-size: 12px; }
+
+.priority-merge { display: grid; grid-template-columns: 1fr 42px 1fr 42px 1fr; align-items: center; }
+.observation-stack { display: grid; gap: 8px; }
+.observation { padding: 10px; border-radius: 9px; background: var(--teal-soft); color: #24515a; font: 700 11px monospace; }
+.observation.slice { background: var(--violet-soft); color: #59458c; }
+.grid-index { display: grid; grid-template-columns: repeat(5,28px); gap: 3px; justify-content: center; }
+.grid-index i { width: 28px; height: 28px; border: 1px solid #bec8d2; background: #edf1f3; }
+.grid-index i.hit { background: var(--teal); border-color: var(--teal); }
+.grid-index i.mix { background: var(--amber); border-color: var(--amber); }
+.average-result { padding: 18px; border-radius: 14px; background: var(--green-soft); text-align: center; }
+.average-result b { display: block; color: var(--green); font-size: 18px; }
+.average-result span { color: #436a53; font-size: 12px; }
+
+@media (max-width: 1000px) {
+  .requirements-layout,.method-layout,.cloud-result,.pass-focus { grid-template-columns: 1fr 1fr; }
+  .decision-card { padding: 18px; }
+  .method-layout .source-window,.cloud-result .source-window { min-height: 430px; }
+}
+
+@media (max-width: 700px) {
+  .requirements-layout,.method-layout,.cloud-result,.pass-focus,.decision-list,.capture-three { grid-template-columns: 1fr; }
+  .requirements-visual { min-height: 620px; }
+  .source-window { min-height: 340px; }
+  .capture-phase:not(:last-child)::after { display: none; }
+  .point-contract { grid-template-columns: 1fr 1fr; }
+  .priority-merge { min-width: 680px; }
+}

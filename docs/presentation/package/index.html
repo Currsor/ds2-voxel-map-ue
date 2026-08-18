@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="UE 真实场景到稀疏体素资产的工程化采集管线演示">
+  <title>从真实场景到稀疏体素资产</title>
+  <link rel="stylesheet" href="./voxel-capture-deck.css">
+</head>
+<body>
+  <div class="progress" aria-hidden="true"></div>
+  <main class="deck" aria-live="polite">
+    <section class="slide hero active" data-title="封面" aria-hidden="false">
+      <div class="slide-body animate">
+        <div class="hero-mark"><i></i><b>DS2 VOXEL MAP · UE 5.4/5.5</b></div>
+        <p class="eyebrow">REAL-SCENE VOXEL CAPTURE PIPELINE</p>
+        <h1>从真实场景到<br><span>稀疏体素资产</span></h1>
+        <p class="lead">一条可解释、可扩展、可验收的编辑器离线采集管线</p>
+        <div class="hero-chips"><span class="chip">C++ / Global Shader</span><span class="chip">SceneCapture2D</span><span class="chip">FRHIGPUTextureReadback</span><span class="chip">4×4×4 Sparse Block</span></div>
+      </div>
+      <div class="slide-foot"><span>入口 → 视图 → GPU → 重建 → 融合 → 清理 → 资产</span><span>2026 · Technical Walkthrough</span></div>
+    </section>
+
+    <section class="slide" data-title="问题分析" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">01 · PROBLEM</p><h2>真正困难的不是“采到像素”</h2></div><span class="slide-no">02 / 14</span></header>
+      <div class="slide-body">
+        <div class="grid-2 animate">
+          <article class="card problem"><span class="num">01</span><h3>遮挡造成系统性缺失</h3><p class="muted">单相机只能看到第一层表面；外部轮廓、背面、洞穴与内部结构无法由一次投影覆盖。</p></article>
+          <article class="card problem"><span class="num">02</span><h3>屏幕像素不是世界几何</h3><p class="muted">深度定义、透视射线、正交偏移和项目的 X/Z/Y 轴映射任一出错，都会让体素整体错位。</p></article>
+          <article class="card problem"><span class="num">03</span><h3>多视图会重复且冲突</h3><p class="muted">同一表面可能被多次命中；掠射样本、轮廓深度突变和高分辨率视图会带来偏置与噪点。</p></article>
+          <article class="card problem"><span class="num">04</span><h3>密集数据不可直接交付</h3><p class="muted">大范围网格需要稀疏压缩、稳定排序、分区持久化，以及能阻止坏数据进入 Shader 的质量门禁。</p></article>
+        </div>
+        <p class="callout" style="margin-top:20px"><b>核心问题：</b>如何把“可见表面采样”可靠地转化为“确定、紧凑、可渲染的体素资产”？</p>
+      </div>
+      <footer class="slide-foot"><span>问题定义决定架构，而不是反过来</span><span>DS2 Voxel Map</span></footer>
+    </section>
+
+    <section class="slide" data-title="方案选择" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">02 · DECISION</p><h2>方案选择：离线多视图采集</h2></div><span class="slide-no">03 / 14</span></header>
+      <div class="slide-body animate">
+        <table class="compare">
+          <thead><tr><th style="width:18%">路线</th><th style="width:22%">优点</th><th style="width:24%">主要代价</th><th style="width:22%">适用边界</th><th>结论</th></tr></thead>
+          <tbody>
+            <tr><td>直接读取 Mesh</td><td>几何精确</td><td>材质、Nanite、实例与多资产类型适配复杂</td><td>封闭、标准化静态网格</td><td>不作为通用入口</td></tr>
+            <tr><td>运行时动态体素化</td><td>可实时更新</td><td>GPU 成本高，资产不可复用，调试与验收困难</td><td>小范围动态破坏</td><td>超出演示目标</td></tr>
+            <tr class="selected"><td>SceneCapture 多视图</td><td>兼容关卡最终可见结果</td><td>需要解决遮挡、读回、融合和误差</td><td>编辑器离线烘焙</td><td><span class="pill">采用</span></td></tr>
+          </tbody>
+        </table>
+        <div class="grid-3" style="margin-top:16px">
+          <article class="card choice"><h3>几何信号</h3><p class="muted">SceneDepth 负责重建位置，不从 BaseColor 猜几何。</p></article>
+          <article class="card choice"><h3>颜色信号</h3><p class="muted">采 BaseColor 而非最终光照色，避免昼夜、阴影与雾被烘焙。</p></article>
+          <article class="card choice"><h3>覆盖策略</h3><p class="muted">Hemisphere 负责外部，XYZ Slice 负责遮挡与内部，联合模式互补。</p></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>选择依据：兼容性、可重复性、工程成本</span><span>UE Editor Offline Bake</span></footer>
+    </section>
+
+    <section class="slide" data-title="总体架构" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">03 · ARCHITECTURE</p><h2>七阶段闭环：从操作入口到质量资产</h2></div><span class="slide-no">04 / 14</span></header>
+      <div class="slide-body animate">
+        <div class="pipeline">
+          <div class="stage"><span>01</span><b>入口</b><small class="muted">选择采集意图</small></div><div class="stage"><span>02</span><b>视图</b><small class="muted">生成任务队列</small></div>
+          <div class="stage"><span>03</span><b>GPU 采集</b><small class="muted">Depth + Color</small></div><div class="stage"><span>04</span><b>像素重建</b><small class="muted">Screen → World</small></div>
+          <div class="stage"><span>05</span><b>体素融合</b><small class="muted">View → Global</small></div><div class="stage"><span>06</span><b>清理</b><small class="muted">Filter + Repair</small></div>
+          <div class="stage"><span>07</span><b>资产输出</b><small class="muted">Sparse + QA</small></div>
+        </div>
+        <div class="grid-3" style="margin-top:32px">
+          <article class="card win"><h3>统一数据契约</h3><p class="muted"><span class="mono">FCaptureJob</span> 串起视图，<span class="mono">FCaptureAccumulator</span> 汇聚观测，Builder 负责最终布局。</p></article>
+          <article class="card win"><h3>同步 / 异步同结果</h3><p class="muted">只替换 GPU 读回调度，不复制重建、融合和资产构建逻辑。</p></article>
+          <article class="card win"><h3>错误止于资产之前</h3><p class="muted">Validate 与 M7 门禁将数据布局、覆盖率、误差和确定性纳入闭环。</p></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>一条流水线，两种调度方式，两类资产目标</span><span>Pipeline Overview</span></footer>
+    </section>
+
+    <section class="slide" data-title="入口" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">04 · ENTRY</p><h2>入口：先表达采集意图</h2></div><span class="slide-no">05 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">四个入口不是四条独立实现，而是四种 <b class="accent">视图任务组合</b>。</p>
+          <div class="entry-grid">
+            <div class="entry-card"><div class="icon">1V</div><h3>Single View</h3><p>快速验证方向、深度、颜色与坐标。</p></div>
+            <div class="entry-card"><div class="icon">H</div><h3>Hemisphere</h3><p>Fibonacci 半球覆盖外部可见表面。</p></div>
+            <div class="entry-card"><div class="icon">XYZ</div><h3>Slice</h3><p>正交薄层减少复杂场景遮挡缺失。</p></div>
+            <div class="entry-card"><div class="icon">H+</div><h3>Combined</h3><p>两类任务共享同一全局累加器。</p></div>
+          </div>
+          <p class="callout" style="margin-top:16px">入口完成参数校验、网格对齐、输出目标检查，再决定同步或异步调度。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="半球与切片采集任务汇入统一累加器">
+          <div class="visual-label"><span>Coverage intent</span><span>Unified accumulator</span></div>
+          <div class="capture-map">
+            <div class="capture-scene"><div class="orbit"></div><i class="camera-dot a"></i><i class="camera-dot b"></i><i class="camera-dot c"></i><i class="camera-dot d"></i><i class="camera-dot e"></i><div class="slab"></div><div class="capture-bounds"></div><div class="axis"><i class="x">X</i><i class="y">Y</i><i class="z">Z</i></div></div>
+            <div class="flow-arrow"></div>
+            <div class="accumulator"><div class="node teal" style="--fill:88%"><b>Hemisphere Jobs</b><small>外部表面覆盖</small></div><div class="node violet" style="--fill:72%"><b>XYZ Slice Jobs</b><small>遮挡与内部补充</small></div><div class="node green" style="--fill:100%"><b>FCaptureAccumulator</b><small>统一过滤与输出</small></div></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>BakeCombinedWorldCapture = Hemisphere Jobs + Slice Jobs</span><span>Stage 01</span></footer>
+    </section>
+
+    <section class="slide" data-title="视图" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">05 · VIEW GENERATION</p><h2>视图：把空间覆盖变成确定任务</h2></div><span class="slide-no">06 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <h3 class="accent">透视任务</h3><p>Single / Fibonacci Hemisphere；相机位于包围球外并朝向范围中心。</p>
+          <h3 class="violet">正交任务</h3><p>沿世界 X/Y/Z 拆分薄层；可从轴正反方向采集，并记录 Slab 边界。</p>
+          <div class="formula">Grid = ceil(Bounds.Size / VoxelSize)<br>Grid = AlignUp(Grid, 4)<br>Job = Camera + Projection + Optional Slab</div>
+          <p class="muted">网格对齐到 4，确保后续直接映射到固定 <span class="mono">4×4×4</span> Block。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="体素网格生成视图任务并排入队列">
+          <div class="visual-label"><span>Aligned grid</span><span>FCaptureJob queue</span></div>
+          <div class="job-builder">
+            <div><div class="voxel-grid-mini"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p class="mono muted" style="font-size:11px;margin:18px 0 0">Grid % 4 = 0</p></div>
+            <div class="flow-arrow"></div>
+            <div class="job-stack"><div class="job-row"><span class="type">PERS</span><b>Fibonacci 07</b><span>FOV 60°</span></div><div class="job-row"><span class="type">PERS</span><b>Fibonacci 08</b><span>FOV 60°</span></div><div class="job-row slice"><span class="type">ORTHO</span><b>X Slab 03</b><span>± Axis</span></div><div class="job-row slice"><span class="type">ORTHO</span><b>Z Slab 11</b><span>± Axis</span></div></div>
+            <div class="flow-arrow"></div>
+            <div class="queue"><span>JOB 001</span><span>JOB 002</span><span>JOB 003</span><small class="muted mono">… deterministic order</small></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>World X/Z/Y → Voxel X/Y/Z</span><span>Stage 02</span></footer>
+    </section>
+
+    <section class="slide" data-title="GPU 采集" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">06 · GPU CAPTURE</p><h2>GPU 采集：双通道、可异步、可取消</h2></div><span class="slide-no">07 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead"><b class="accent">SceneDepth</b> 定位，<b class="violet">BaseColor</b> 着色。</p>
+          <ul><li>每个视图执行两次 <span class="mono">SceneCaptureComponent2D</span>。</li><li>临时目标为 <span class="mono">RGBA32f</span>，Depth 与 Color 像素数必须一致。</li><li>异步路径使用 <span class="mono">FRHIGPUTextureReadback</span> 跨 Tick 推进。</li><li>取消只发出请求，等待当前 GPU 读回到达安全释放点。</li></ul>
+          <p class="callout">设计原则：让调度异步，而不是让数据语义分叉。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="深度和颜色双通道通过异步状态机读回 CPU">
+          <div class="visual-label"><span>GPU render</span><span>CPU merge</span></div>
+          <div class="gpu-diagram">
+            <div class="capture-pass"><div class="pass-card"><b>SceneDepth</b><small class="muted">Linear depth · RGBA32f</small><div class="depth-strip"></div></div><div class="pass-card"><b>BaseColor</b><small class="muted">Unlit material signal</small><div class="color-strip"></div></div></div>
+            <div class="flow-arrow"></div>
+            <div class="state-machine"><div class="state">Submit Depth</div><div class="state wait">Wait Depth</div><div class="state">Submit Color</div><div class="state wait">Wait Color</div><div class="state done">Finalize View / Next Tick</div></div>
+            <div class="flow-arrow"></div>
+            <div class="readback"><div class="node blue"><b>GPU Readback</b><small>FRHIGPUTextureReadback</small></div><div class="memory-bar"></div><small class="mono">DepthPixels[]<br>ColorPixels[]</small></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>SubmitDepth → WaitDepth → SubmitColor → WaitColor</span><span>Stage 03</span></footer>
+    </section>
+
+    <section class="slide" data-title="像素重建" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">07 · PIXEL RECONSTRUCTION</p><h2>像素重建：从屏幕样本回到体素坐标</h2></div><span class="slide-no">08 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <div class="formula">Perspective:<br>World = Camera + Ray × Depth / dot(Ray, Forward)<br><br>Orthographic:<br>World = Camera + Forward×Depth + Right×X + Up×Y</div>
+          <ul><li>过滤非法深度、范围外采样和切片 Slab 外采样。</li><li>由水平 / 垂直邻居估计法线与深度连续性。</li><li><span class="mono">Confidence = Facing × EdgePenalty</span>。</li><li>量化到网格，同时记录到体素中心的误差。</li></ul>
+        </div>
+        <div class="visual-frame" role="img" aria-label="屏幕像素经过反投影、世界坐标、置信度和体素量化">
+          <div class="visual-label"><span>Pixel sample</span><span>Voxel observation</span></div>
+          <div class="reconstruct">
+            <div class="recon-step"><div class="pixel-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><b>像素中心</b><small>Depth + Color</small></div>
+            <div class="recon-step"><div class="ray-sketch"><i></i></div><b>反投影</b><small>Perspective / Ortho</small></div>
+            <div class="recon-step"><div class="world-point"></div><b>世界位置</b><small>Bounds / Slab test</small></div>
+            <div class="recon-step"><div class="confidence-gauge"></div><b>置信度</b><small>Facing × Edge</small></div>
+            <div class="recon-step"><div class="voxel-cube"></div><b>体素量化</b><small>floor(Relative)</small></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Screen Pixel → World Sample → Voxel Coordinate</span><span>Stage 04</span></footer>
+    </section>
+
+    <section class="slide" data-title="体素融合" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">08 · VOXEL FUSION</p><h2>体素融合：先消除像素密度，再融合视图</h2></div><span class="slide-no">09 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <h3 class="accent">Level 1 · 视图内融合</h3><p>同一视图的多个像素落入同一体素，只形成一次独立观测。</p>
+          <div class="formula">WeightedColor += Color × Confidence<br>ViewAverage = WeightedColor / TotalWeight</div>
+          <h3 class="violet">Level 2 · 跨视图融合</h3><p>每个视图以自身最大置信度作为权重，避免高分辨率视图因像素更多而压倒其他视图。</p>
+          <div class="formula">GlobalColor += ViewAverage × ViewWeight<br>ObservationCount += 1</div>
+        </div>
+        <div class="visual-frame" role="img" aria-label="单视图像素先融合，再跨视图进入全局累加器">
+          <div class="visual-label"><span>Pixel samples</span><span>Global voxel</span></div>
+          <div class="fusion-board">
+            <div><div class="node"><b>View A · same voxel</b><small>多个像素，一次观测</small><div class="sample-row"><i class="sample" data-c=".90" style="--sample:#a66b48"></i><i class="sample" data-c=".72" style="--sample:#b77b51;--alpha:.9"></i><i class="sample" data-c=".43" style="--sample:#7f8f75;--alpha:.78"></i><i class="sample" data-c=".21" style="--sample:#66848a;--alpha:.62"></i></div></div><div class="formula" style="font-size:11px;margin-bottom:0">Σ(Color × Confidence)<br>ΣConfidence</div></div>
+            <div class="flow-arrow"></div>
+            <div class="view-stack"><div class="view-card"><b><span>View A</span><span>.90</span></b><i style="--w:90%"></i></div><div class="view-card"><b><span>View B</span><span>.75</span></b><i style="--w:75%;background:linear-gradient(90deg,var(--violet) 75%,#e3e7eb 75%)"></i></div><div class="view-card"><b><span>View C</span><span>.58</span></b><i style="--w:58%;background:linear-gradient(90deg,var(--amber) 58%,#e3e7eb 58%)"></i></div></div>
+            <div class="flow-arrow"></div>
+            <div class="global-acc"><div class="acc-row"><b>WeightedColorSum</b><small>视图平均色 × 权重</small></div><div class="acc-row"><b>TotalWeight</b><small>有效视图权重之和</small></div><div class="acc-row"><b>MaximumConfidence</b><small>最高样本置信度</small></div><div class="acc-row"><b>ObservationCount</b><small>独立视图数量</small></div></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Pixel Density Bias Removed</span><span>Stage 05</span></footer>
+    </section>
+
+    <section class="slide" data-title="清理" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">09 · CLEANUP</p><h2>清理：把“观测集合”变成“可信拓扑”</h2></div><span class="slide-no">10 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <div class="grid-3"><article class="card"><span class="num">A</span><h3>置信度门禁</h3><p class="muted">多次独立观测，或一次高置信正视观测。</p></article><article class="card"><span class="num">B</span><h3>孤立点清理</h3><p class="muted">检查 26 邻域，删除完全无邻居的飞点。</p></article><article class="card"><span class="num">C</span><h3>保守补洞</h3><p class="muted">多轴对向邻居同时成立才填充；默认关闭。</p></article></div>
+          <p class="callout" style="margin-top:20px"><b>取舍：</b>宁可保留真实洞穴与薄壁，也不默认用形态学操作“修平”场景。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="体素集合经过置信度过滤、孤立点清理和可选补洞">
+          <div class="visual-label"><span>Candidate voxels</span><span>Trusted topology</span></div>
+          <div class="cleanup-board">
+            <div class="cleanup-panel"><h4>置信度门禁</h4><div class="voxels"><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="noise"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i></i><i class="noise"></i><i></i><i></i><i></i><i></i><i></i></div><div class="cleanup-rule">count ≥ MinObs<br>OR maxConf ≥ High</div></div>
+            <div class="flow-arrow"></div>
+            <div class="cleanup-panel"><h4>26 邻域去飞点</h4><div class="voxels"><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="cleanup-rule">occupiedNeighbors ≥ 1</div></div>
+            <div class="flow-arrow"></div>
+            <div class="cleanup-panel"><h4>可选单体素补洞</h4><div class="voxels"><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="fill"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="cleanup-rule">opposingAxes ≥ threshold</div></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Filter → Remove Isolated → Optional Fill</span><span>Stage 06</span></footer>
+    </section>
+
+    <section class="slide" data-title="资产输出" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">10 · ASSET OUTPUT</p><h2>资产输出：稀疏布局与质量门禁同一次提交</h2></div><span class="slide-no">11 / 14</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">把保留体素转为 <b class="accent">非空 Block + 紧凑 VoxelData</b>。</p>
+          <ul><li>每个 <span class="mono">4×4×4</span> Block 用 8-bit 粗掩码与 64-bit 精细掩码描述占用。</li><li>Block 记录 24-bit 线性索引与 VoxelData 起始位置。</li><li>体素保存 <span class="mono">RGB24 + Extra8</span>，按 Block / LocalBit 稳定排序。</li><li>验证通过后写单资产或分区世界资产，并刷新预览 Renderer。</li></ul>
+          <p class="callout">坏布局不提交；提交后立即计算 M7 报告与确定性 Hash。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="占用体素打包为稀疏块并通过验证写入资产">
+          <div class="visual-label"><span>Sparse builder</span><span>Commit + M7</span></div>
+          <div class="asset-board">
+            <div><div class="block-source"><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i></div><p class="mono muted" style="font-size:11px;text-align:center;margin:15px 0 0">4×4×4 OCCUPANCY</p></div>
+            <div class="flow-arrow"></div>
+            <div class="bit-layout"><div class="bit-row"><span>8 bit</span><span>Coarse Occupancy</span></div><div class="bit-row"><span>24 bit</span><span>Block Linear Index</span></div><div class="bit-row"><span>64 bit</span><span>Fine Occupancy</span></div><div class="bit-row"><span>32 bit</span><span>VoxelData Start</span></div></div>
+            <div class="flow-arrow"></div>
+            <div class="data-stack"><span>RGB24 + Extra8</span><span>RGB24 + Extra8</span><span>RGB24 + Extra8</span><small class="muted mono">compact stream</small></div>
+          </div>
+          <div class="commit-row"><div class="node blue"><b>VoxelMapDataAsset</b><small>单资产输出</small></div><div class="node violet"><b>VoxelMapWorldAsset</b><small>Region 分区输出</small></div></div>
+          <div class="qa-strip"><span>VALID</span><span>COVERAGE</span><span>ERROR</span><span>SHA-1</span></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>SourceVoxels → Builder → Validate → Commit → Report</span><span>Stage 07</span></footer>
+    </section>
+
+    <section class="slide" data-title="工程化设计" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">11 · ENGINEERING</p><h2>工程化：规模、交互与运行时边界</h2></div><span class="slide-no">12 / 14</span></header>
+      <div class="slide-body animate">
+        <div class="grid-4"><article class="card win metric"><strong>Tick</strong><h3>异步状态机</h3><span>GPU 未就绪时让出编辑器线程，避免逐视图 Flush 阻塞。</span></article><article class="card win metric"><strong>128³</strong><h3>建议 Region</h3><span>大世界拆成独立区域资产，运行时仍重映射到同一 Shader 数据布局。</span></article><article class="card win metric"><strong>24 bit</strong><h3>Block 地址</h3><span>初始化阶段校验总 Block 数，越界在采集前失败。</span></article><article class="card win metric"><strong>0</strong><h3>运行时 Collector</h3><span>Collector 为 Editor Only；完成烘焙后运行时只消费持久化资产。</span></article></div>
+        <div class="grid-2" style="margin-top:22px"><article class="card choice"><h3>单资产</h3><p class="muted">适合中小范围与快速迭代；一次 Build / Validate / Commit。</p></article><article class="card choice"><h3>分区世界资产</h3><p class="muted">按 Region 生成子资产；WorldAsset 保存空间索引和引用清单。</p></article></div>
+        <p class="callout" style="margin-top:20px">Renderer 与 Shader 不感知采集方式：它们只消费统一的稀疏 GPU 数据。</p>
+      </div>
+      <footer class="slide-foot"><span>离线复杂，运行时简单</span><span>Scalability</span></footer>
+    </section>
+
+    <section class="slide" data-title="验收与调优" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">12 · QUALITY GATE</p><h2>验收与调优：让结果可量化、可复现</h2></div><span class="slide-no">13 / 14</span></header>
+      <div class="slide-body animate">
+        <div class="grid-4"><article class="card metric"><strong>✓</strong><h3>DataValid</h3><span>Block 数、占用位和 VoxelData 索引布局一致。</span></article><article class="card metric"><strong>%</strong><h3>Coverage</h3><span>已观测候选体素保留率达到设定阈值。</span></article><article class="card metric"><strong>cm</strong><h3>Position Error</h3><span>平均量化误差不超过体素尺度允许值。</span></article><article class="card metric"><strong>SHA-1</strong><h3>Determinism</h3><span>同参数重复烘焙得到相同最终渲染数据。</span></article></div>
+        <div class="grid-2" style="margin-top:22px"><article class="card"><h3 class="accent">推荐首测顺序</h3><p class="muted">Single View 验证坐标 → Hemisphere 检查外部覆盖 → Combined 补内部与遮挡。</p></article><article class="card"><h3 class="violet">推荐首测参数</h3><p class="mono">VoxelSize=20 · Resolution=512<br>HemisphereViews=24 · FOV=60°</p></article></div>
+        <div class="formula">OverallPass = DataValid ∧ CoveragePass ∧ PositionErrorPass ∧ DeterministicHashPass</div>
+      </div>
+      <footer class="slide-foot"><span>LastBakeReport + Saved/VoxelMapReports/*.json</span><span>M7 Acceptance</span></footer>
+    </section>
+
+    <section class="slide hero" data-title="总结" aria-hidden="true">
+      <div class="slide-body animate">
+        <p class="eyebrow">13 · TAKEAWAY</p>
+        <p class="quote">采集管线的价值，不只是把场景“变成体素”，而是把不可控的屏幕观测，转化为<span class="accent">可解释、可压缩、可验收</span>的渲染资产。</p>
+        <div class="pipeline" style="width:100%;margin-top:30px"><div class="stage"><span>01</span><b>入口</b></div><div class="stage"><span>02</span><b>视图</b></div><div class="stage"><span>03</span><b>GPU</b></div><div class="stage"><span>04</span><b>重建</b></div><div class="stage"><span>05</span><b>融合</b></div><div class="stage"><span>06</span><b>清理</b></div><div class="stage"><span>07</span><b>资产</b></div></div>
+        <p class="lead" style="margin-top:32px">下一步：用真实关卡样本建立参数基线，并将 M7 报告接入自动回归。</p>
+      </div>
+      <div class="slide-foot"><span>DS2 Voxel Map · Capture Pipeline</span><span>Q &amp; A</span></div>
+    </section>
+  </main>
+  <nav class="nav" aria-label="幻灯片导航"><button data-prev title="上一页（←）" aria-label="上一页">←</button><span class="counter"><span data-current>01</span> / <span data-total>14</span></span><button data-next title="下一页（→）" aria-label="下一页">→</button><button data-fullscreen title="全屏（F）" aria-label="全屏">⛶</button></nav>
+  <div class="hint">← → 翻页 · F 全屏 · P 打印/PDF</div>
+  <script src="./voxel-capture-deck.js"></script>
+</body>
+</html>

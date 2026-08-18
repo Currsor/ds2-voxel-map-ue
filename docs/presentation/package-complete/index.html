@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="按照死亡搁浅 2 GDC 演讲顺序整理的地图采样技术演示">
+  <title>死亡搁浅 2：从世界到 Point Grid</title>
+  <link rel="stylesheet" href="./voxel-capture-deck.css">
+  <link rel="stylesheet" href="./gdc-sampling.css">
+  <link rel="stylesheet" href="./gdc-rendering.css">
+</head>
+<body>
+  <div class="progress" aria-hidden="true"></div>
+  <main class="deck" aria-live="polite">
+    <section class="slide hero active" data-title="封面" aria-hidden="false">
+      <div class="slide-body animate">
+        <div class="hero-mark"><i></i><b>DEATH STRANDING 2 · VOXEL 3D UI MAP</b></div>
+        <p class="eyebrow">PART 01 · MAP SAMPLING</p>
+        <h1>从游戏世界到<br><span>Point Grid</span></h1>
+        <p class="lead">按照 GDC 演讲的原始顺序，拆解《死亡搁浅 2》如何获取地图 3D 数据，以及我们在 UE 中如何复现这条采样路径。</p>
+        <div class="hero-chips"><span class="chip">设计需求</span><span class="chip">方案选择</span><span class="chip">Hemisphere Pass</span><span class="chip">XYZ Slice Pass</span><span class="chip">Point Grid</span></div>
+      </div>
+      <div class="slide-foot"><span>本篇仅讨论地图采样，不进入体素渲染</span><span class="gdc-source">Making of Voxel 3D UI Map</span></div>
+    </section>
+
+    <section class="slide" data-title="设计起点" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">01 · DESIGN CONTEXT</p><h2>从“可以倾斜的 2D 地图”开始</h2></div><span class="slide-no">02 / 41</span></header>
+      <div class="slide-body">
+        <div class="story-bridge animate">
+          <article class="story-card">
+            <div class="source-window map"><img src="./assets/gdc/ds1-map.png" alt="死亡搁浅第一代 UI 地图"><span class="image-caption">Death Stranding · 2019</span></div>
+            <h3>第一代：高度图 + 视差</h3>
+            <p class="muted">缩远时平滑、信息明确；靠近后会暴露高度图分辨率，桥下、悬挑与垂直结构也无法真正成立。</p>
+          </article>
+          <div class="flow-arrow"></div>
+          <article class="story-card">
+            <div class="source-window map"><img src="./assets/gdc/ds2-map.png" alt="死亡搁浅 2 三维 UI 地图"><span class="image-caption">Death Stranding 2 · Ring Terminal</span></div>
+            <h3>第二代：完整 3D 地图</h3>
+            <p class="muted">地图不再只是带纵深感的平面，而要让玩家直接读出陡坡、死胡同和复杂建筑空间。</p>
+          </article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>问题不是“让地图更立体”，而是“让地图拥有真实空间结构”</span><span>GDC 03–05</span></footer>
+    </section>
+
+    <section class="slide" data-title="设计需求" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">02 · REQUIREMENTS</p><h2>四个要求共同限定技术路线</h2></div><span class="slide-no">03 / 41</span></header>
+      <div class="slide-body requirements-layout">
+        <div class="requirements-visual animate">
+          <div class="map-generation" data-label="DS1 · HEIGHT MAP"><img src="./assets/gdc/ds1-map.png" alt="第一代高度图地图"></div>
+          <div class="map-generation" data-label="DS2 · FULL 3D"><img src="./assets/gdc/ds2-map.png" alt="第二代全三维地图"></div>
+        </div>
+        <div class="requirement-list animate">
+          <article class="requirement" data-no="01"><h3>必须是全三维</h3><p>玩家需要从地图直接判断陡坡、断崖、死胡同和建筑空间。</p></article>
+          <article class="requirement" data-no="02"><h3>不能增加美术工作量</h3><p>地图数据应从最终游戏世界自动获得，而不是再制作一套地图专用资产。</p></article>
+          <article class="requirement" data-no="03"><h3>内存与加载必须轻量</h3><p>地图叠加在现有世界资源之上，必须保持较小体积并支持快速加载。</p></article>
+          <article class="requirement" data-no="04"><h3>符合帧时间预算</h3><p>缩放与导航不能引发卡顿，渲染成本必须与游戏其余系统共存。</p></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>采样部分首先解决前 3 项：3D 数据、自动生产、紧凑表达</span><span>GDC Requirement</span></footer>
+    </section>
+
+    <section class="slide" data-title="目标形态" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">03 · TARGET EXPERIENCE</p><h2>远看是世界，近看是体素化几何</h2></div><span class="slide-no">04 / 41</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">视角拉远，保留完整世界的自然全貌；视角拉近，逐渐看见构成世界的离散几何。</p>
+          <div class="grid-2">
+            <article class="card win"><span class="num">FAR</span><h3>整体可读性</h3><p class="muted">地形、路线、设施和区域边界共同服务导航决策。</p></article>
+            <article class="card choice"><span class="num">NEAR</span><h3>三维结构感</h3><p class="muted">山脊、桥梁、峡谷和建筑不再被压扁到单一高度层。</p></article>
+          </div>
+          <p class="callout" style="margin-top:18px">为了得到这种地图，第一步不是决定“怎么画体素”，而是决定“如何从最终世界获得足够完整的 3D 数据”。</p>
+        </div>
+        <div class="source-window map" style="height:min(60vh,560px)"><img src="./assets/gdc/ds2-map.png" alt="死亡搁浅 2 UI 三维地图"><span class="image-caption">目标结果：可缩放的完整 3D 世界地图</span></div>
+      </div>
+      <footer class="slide-foot"><span>Getting 3D Data From The World</span><span>GDC 05–06</span></footer>
+    </section>
+
+    <section class="slide" data-title="获取方案" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">04 · OPTIONS</p><h2>获取 3D 数据：依次尝试三条路线</h2></div><span class="slide-no">05 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="decision-list">
+          <article class="decision-card rejected"><span class="decision-mark">×</span><h3>高度图重建</h3><p>从 Height + Color 的俯视投影恢复三维地形。</p><strong>简单地形有效，但无法表达多层空间。</strong></article>
+          <article class="decision-card rejected"><span class="decision-mark">×</span><h3>导出实例几何</h3><p>直接导出游戏世界中已放置的 Mesh 实例。</p><strong>几何精确，但拿不到最终着色结果。</strong></article>
+          <article class="decision-card selected"><span class="decision-mark">✓</span><h3>烘焙点云</h3><p>从多个摄像机视角渲染世界区块，并由 G-buffer 生成三维点。</p><strong>同时获得空间、颜色和其他表面信息。</strong></article>
+        </div>
+        <p class="callout" style="margin-top:20px"><b>决策标准：</b>不仅要有几何，还要自动反映游戏中最终可见的材质混合、贴花和环境状态。</p>
+      </div>
+      <footer class="slide-foot"><span>Height Map × · Export Geometry × · Bake Point Cloud ✓</span><span>GDC 07–09</span></footer>
+    </section>
+
+    <section class="slide" data-title="高度图重建" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">05 · ATTEMPT A</p><h2>高度图重建：适合占位，不适合作为最终数据</h2></div><span class="slide-no">06 / 41</span></header>
+      <div class="slide-body method-layout">
+        <div class="source-window method"><img src="./assets/gdc/height-comparison.png" alt="高度图重建的游戏画面与结果对比"><span class="image-caption">Game View ↔ Height + Color Map</span></div>
+        <div class="method-copy animate">
+          <span class="verdict">× REJECTED</span>
+          <h3>单值高度无法表达多层空间</h3>
+          <p>对普通地表，它简单、稳定、生成快速；但同一个平面位置只能保存一个高度。</p>
+          <div class="why"><b>因此会丢失：</b><br>桥下空间、洞穴、悬挑、建筑内部，以及上下重叠的复杂结构。</div>
+          <p class="muted" style="margin-top:16px">GDC 中仍将它保留为正式体素地图完成前的临时占位方案。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>优点：便宜、快速 · 限制：2.5D</span><span>GDC 07</span></footer>
+    </section>
+
+    <section class="slide" data-title="导出几何" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">06 · ATTEMPT B</p><h2>导出实例几何：几何正确，但不是最终世界</h2></div><span class="slide-no">07 / 41</span></header>
+      <div class="slide-body method-layout">
+        <div class="source-window method"><img src="./assets/gdc/asset-comparison.png" alt="岩石资产与高山最终着色结果对比"><span class="image-caption">Rocks Asset ↔ Positioned High On A Mountain</span></div>
+        <div class="method-copy animate">
+          <span class="verdict">× REJECTED</span>
+          <h3>资产本体不等于最终像素</h3>
+          <p>导出 Mesh 可以得到非常精确的几何，但它绕过了游戏运行时的最终材质组合。</p>
+          <div class="why"><b>缺少的信息包括：</b><br>混合纹理、贴花、地形融合、积雪过渡，以及依赖世界状态的着色结果。</div>
+          <p class="muted" style="margin-top:16px">图中的同一岩石被放到高山后，最终世界会出现积雪；仅导出原资产无法得到这层结果。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Placed Asset ≠ Final Shaded World</span><span>GDC 08</span></footer>
+    </section>
+
+    <section class="slide" data-title="烘焙点云" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">07 · FINAL CHOICE</p><h2>最终方案：从最终渲染结果烘焙点云</h2></div><span class="slide-no">08 / 41</span></header>
+      <div class="slide-body cloud-result">
+        <div class="source-window cloud"><img src="./assets/gdc/baked-point-cloud.png" alt="死亡搁浅 2 烘焙点云结果"><span class="image-caption">Bake Point Cloud ✓</span></div>
+        <div class="signal-stack animate">
+          <span class="verdict ok" style="justify-self:start">✓ SELECTED</span>
+          <article class="signal-card geometry"><b>多摄像机覆盖世界区块</b><span>从不同方向渲染，避免把世界限制成单一俯视表面。</span></article>
+          <article class="signal-card surface"><b>从 G-buffer 生成 3D 点</b><span>每个有效像素提供世界空间位置、最终颜色和其他表面数值。</span></article>
+          <article class="signal-card water"><b>补充物理引擎数据</b><span>GDC 方案额外采样水体信息；演讲图中蓝色区域代表水。</span></article>
+          <p class="callout">这条路线同时满足：真实三维、无需额外美术资产、可继续压缩。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Render World Chunks → Read G-buffer → Build 3D Points</span><span>GDC 09</span></footer>
+    </section>
+
+    <section class="slide" data-title="采样全流程" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">08 · CAPTURE PROCESS</p><h2>采样过程分为三个连续阶段</h2></div><span class="slide-no">09 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="capture-three">
+          <article class="capture-phase"><span class="phase-no">01</span><h3>Hemisphere Pass</h3><div class="phase-visual"><div class="hemisphere-mini"><div class="orbit"></div><div class="terrain"></div><i class="camera-dot a"></i><i class="camera-dot b"></i><i class="camera-dot c"></i><i class="camera-dot d"></i><i class="camera-dot e"></i></div></div><p>在区块上方半球均匀放置摄像机，覆盖主要外部表面。</p></article>
+          <article class="capture-phase"><span class="phase-no">02</span><h3>XYZ Slice Pass</h3><div class="phase-visual"><div class="slice-mini"><div class="terrain"></div><i></i><i></i><i></i><i></i></div></div><p>摄像机沿三个坐标轴穿过区块，补足桥下、峡谷和建筑内部。</p></article>
+          <article class="capture-phase"><span class="phase-no">03</span><h3>Point Cloud → Grid</h3><div class="phase-visual"><div class="point-grid-mini"><i style="left:8%;top:76%"></i><i style="left:18%;top:65%"></i><i style="left:27%;top:73%"></i><i style="left:36%;top:49%"></i><i style="left:45%;top:16%"></i><i style="left:53%;top:45%"></i><i style="left:62%;top:58%"></i><i style="left:72%;top:39%"></i><i style="left:82%;top:72%"></i><i style="left:14%;top:86%"></i><i style="left:31%;top:84%"></i><i style="left:48%;top:64%"></i><i style="left:65%;top:77%"></i><i style="left:88%;top:83%"></i></div></div><p>将浮点点云量化为区块包围盒内的整数索引，并合并重复位置。</p></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Hemisphere Pass → XYZ Slice Pass → Point Grid</span><span>GDC 10</span></footer>
+    </section>
+
+    <section class="slide" data-title="半球采样" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">09 · HEMISPHERE PASS</p><h2>第一阶段：像摄影一样覆盖外部表面</h2></div><span class="slide-no">10 / 41</span></header>
+      <div class="slide-body pass-focus">
+        <div class="visual-frame" role="img" aria-label="区块上方半球均匀分布多个摄像机">
+          <div class="visual-label"><span>Uniform camera distribution</span><span>Outer surface coverage</span></div>
+          <div class="capture-scene" style="transform:scale(1.45);margin-top:30px"><div class="orbit"></div><i class="camera-dot a"></i><i class="camera-dot b"></i><i class="camera-dot c"></i><i class="camera-dot d"></i><i class="camera-dot e"></i><div class="capture-bounds"></div><div class="axis"><i class="x">X</i><i class="y">Y</i><i class="z">Z</i></div></div>
+        </div>
+        <div class="pass-notes animate">
+          <article class="pass-note gdc"><b>GDC 原始描述</b><span>多个摄像机均匀分布在世界区块上方的半球区域，渲染多张画面。</span></article>
+          <article class="pass-note project"><b>我们的 UE 对应实现</b><span><span class="mono">BakeHemisphereCapture</span> 使用 Fibonacci Hemisphere 生成稳定、均匀的视图方向。</span></article>
+          <article class="pass-note project"><b>每个视图采什么</b><span><span class="mono">SceneDepth</span> 用于重建空间位置，<span class="mono">BaseColor</span> 提供不带光照的表面颜色。</span></article>
+          <article class="pass-note"><b>能力边界</b><span>适合地形和建筑外表面；仍会漏掉被上层结构遮挡的空间，因此必须进入 Slice Pass。</span></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>公开资料确认“均匀半球”；具体视角数属于工程复原参数</span><span>Pass 01</span></footer>
+    </section>
+
+    <section class="slide" data-title="切片采样" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">10 · XYZ SLICE PASS</p><h2>第二阶段：让摄像机穿过区块内部</h2></div><span class="slide-no">11 / 41</span></header>
+      <div class="slide-body pass-focus">
+        <div class="visual-frame" role="img" aria-label="沿 X Y Z 三轴逐层进行正交切片采样">
+          <div class="visual-label"><span>Axis-aligned sweep</span><span>Occluded space recovery</span></div>
+          <div class="job-builder" style="grid-template-columns:.75fr 34px 1.25fr">
+            <div class="capture-scene" style="transform:scale(.95)"><div class="slab"></div><div class="capture-bounds"></div><div class="axis"><i class="x">X</i><i class="y">Y</i><i class="z">Z</i></div></div>
+            <div class="flow-arrow"></div>
+            <div class="job-stack"><div class="job-row slice"><span class="type">X</span><b>Slice 01 → N</b><span>ORTHO</span></div><div class="job-row slice"><span class="type">Y</span><b>Slice 02 → N</b><span>ORTHO</span></div><div class="job-row slice"><span class="type">Z</span><b>Slice 03 → N</b><span>ORTHO</span></div><div class="node violet"><b>Bridge / Canyon / Interior</b><small>半球视图无法覆盖的数据</small></div></div>
+          </div>
+        </div>
+        <div class="pass-notes animate">
+          <article class="pass-note gdc"><b>GDC 原始描述</b><span>沿每个坐标轴移动摄像机并渲染切片，用于捕捉桥下、峡谷内部和建筑内部。</span></article>
+          <article class="pass-note project"><b>我们的 UE 对应实现</b><span><span class="mono">BakeXYZSliceCapture</span> 使用三轴正交相机，并只接受当前 Slab 范围内的重建点。</span></article>
+          <article class="pass-note project"><b>为何限定 Slab</b><span>如果正交视图接受射线上的所有表面，同一视图仍会被最近遮挡面主导；薄层约束让采样空间逐层推进。</span></article>
+          <article class="pass-note"><b>与半球互补</b><span>Hemisphere 提供更自然的外表面结果；Slice 专门提高内部与遮挡区域覆盖。</span></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>沿 X / Y / Z 穿过区块，而不是只从区块外部观看</span><span>Pass 02</span></footer>
+    </section>
+
+    <section class="slide" data-title="像素转三维点" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">11 · G-BUFFER TO POINTS</p><h2>每张渲染结果如何变成三维点</h2></div><span class="slide-no">12 / 41</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">GDC 给出的是原则：从 G-buffer 生成 3D 点。我们的实现将它拆成可验证的五步。</p>
+          <div class="formula">Pixel + SceneDepth + Camera<br>→ World Position<br>→ Bounds / Slab Test<br>→ Grid Coordinate</div>
+          <div class="point-contract">
+            <div class="contract-item"><b>POSITION</b><span>由深度与相机投影反算世界位置</span></div>
+            <div class="contract-item"><b>COLOR</b><span>从 BaseColor 获取表面颜色</span></div>
+            <div class="contract-item"><b>SOURCE</b><span>记录 Hemisphere 或 Slice 来源</span></div>
+            <div class="contract-item"><b>WEIGHT</b><span>工程实现附加置信度用于融合</span></div>
+          </div>
+          <p class="callout" style="margin-top:17px">物理水体采样属于 GDC 原方案；当前项目主线先完成几何与颜色采集，水体可作为独立数据通道扩展。</p>
+        </div>
+        <div class="visual-frame" role="img" aria-label="像素深度反投影到世界空间并量化到网格">
+          <div class="visual-label"><span>Rendered pixels</span><span>3D observations</span></div>
+          <div class="reconstruct">
+            <div class="recon-step"><div class="pixel-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><b>像素</b><small>Depth + Color</small></div>
+            <div class="recon-step"><div class="ray-sketch"><i></i></div><b>反投影</b><small>Camera Projection</small></div>
+            <div class="recon-step"><div class="world-point"></div><b>世界点</b><small>World Position</small></div>
+            <div class="recon-step"><div class="confidence-gauge"></div><b>筛选</b><small>Bounds / Slab</small></div>
+            <div class="recon-step"><div class="voxel-cube"></div><b>网格坐标</b><small>Integer Index</small></div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>G-buffer Sample → World-space Point</span><span>Reconstruction</span></footer>
+    </section>
+
+    <section class="slide" data-title="Point Grid" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">12 · POINT GRID</p><h2>第三阶段：把浮点点云压缩成 Point Grid</h2></div><span class="slide-no">13 / 41</span></header>
+      <div class="slide-body visual-split">
+        <div class="visual-copy animate">
+          <p class="lead">不再保存每个点的浮点世界坐标，而是记录它在区块 Bounding Box 内的整数索引。</p>
+          <div class="formula">GridIndex = floor((WorldPosition − Bounds.Min) / CellSize)<br>Color[index] = Average(All colors at index)</div>
+          <ul><li>多个观测落到同一整数位置时合并为一个格点。</li><li>同一位置的颜色由全部颜色求平均。</li><li>GDC 明确提出：发生冲突时优先采用 Hemisphere Pass，而非 Slice Pass。</li><li>精度有所下降，但数据尺寸显著降低，并足以满足地图表现。</li></ul>
+        </div>
+        <div class="visual-frame" role="img" aria-label="半球与切片观测量化为整数网格并融合颜色">
+          <div class="visual-label"><span>Point observations</span><span>Integer Point Grid</span></div>
+          <div class="priority-merge">
+            <div class="observation-stack"><div class="observation">H · P(12.4, 8.1, 6.7)</div><div class="observation">H · P(12.2, 8.3, 6.8)</div><div class="observation slice">S · P(12.1, 8.0, 6.6)</div><div class="observation slice">S · P(15.8, 8.2, 7.0)</div></div>
+            <div class="flow-arrow"></div>
+            <div class="grid-index"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="hit"></i><i></i><i></i><i></i><i class="mix"></i><i class="hit"></i><i></i><i></i><i></i><i></i><i class="hit"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="flow-arrow"></div>
+            <div class="average-result"><b>Point Grid</b><span>Integer Position<br>Average Color<br>Hemisphere Priority</span></div>
+          </div>
+          <div class="grid-3" style="margin-top:28px"><article class="card win"><h3>更小</h3><p class="muted">整数索引替代浮点坐标。</p></article><article class="card win"><h3>更稳定</h3><p class="muted">重复观测合并到固定位置。</p></article><article class="card choice"><h3>可继续处理</h3><p class="muted">为后续体素化与渲染准备统一输入。</p></article></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>地图采样部分到此结束 · 下一部分：Point Grid 如何进入体素渲染</span><span>GDC 10</span></footer>
+    </section>
+
+    <section class="slide render-divider" data-title="渲染篇章" aria-hidden="true">
+      <div class="slide-body animate">
+        <p class="eyebrow">PART 02 · VOXEL RENDERING</p>
+        <h2>把数千万体素变成<br>可实时绘制的数据</h2>
+        <p class="lead">关键不是“画立方体”，而是规划一份 Shader 能直接消费的紧凑数据，并让每个 Billboard 像素重建真正的体素表面。</p>
+        <div class="render-chain"><span>Point Grid</span><span>Sparse Block</span><span>128-bit Shape</span><span>32-bit Attribute</span><span>Billboard Trace</span><span>Color + Depth</span></div>
+      </div>
+      <footer class="slide-foot"><span>采样解决“有什么” · 渲染解决“如何紧凑地画出来”</span><span>14 / 33</span></footer>
+    </section>
+
+    <section class="slide" data-title="渲染约束" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">13 · RENDERING CONSTRAINTS</p><h2>数千万体素，不能按普通 Mesh 思路处理</h2></div><span class="slide-no">15 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="big-stat-row">
+          <article class="big-stat"><strong>10M+</strong><b>可见体素</b><span>剔除不可见数据后，仍需处理千万级体素。</span></article>
+          <article class="big-stat"><strong>4+</strong><b>每体素属性</b><span>位置之外还要颜色、高光、粗糙度等信息。</span></article>
+          <article class="big-stat"><strong>6F</strong><b>Cube 面数</b><span>逐体素提交 Mesh 会让三角形与体素数量一起增长。</span></article>
+          <article class="big-stat"><strong>RT</strong><b>动态表现</b><span>需要支持动画与交互，不适合沉重的 BVH / Octree 路径。</span></article>
+        </div>
+        <p class="callout" style="margin-top:22px"><b>GDC 决策：</b>把体素视为粒子，而不是传统静态几何；数据必须能顺序读取、易于上传并直接驱动实例化绘制。</p>
+      </div>
+      <footer class="slide-foot"><span>Memory + Triangle Count + Streaming + Animation</span><span>GDC 11–13</span></footer>
+    </section>
+
+    <section class="slide" data-title="绘制方案演进" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">14 · DRAWING A VOXEL</p><h2>从 Cube Mesh 到 Billboard + Ray–Box</h2></div><span class="slide-no">16 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="render-choice">
+          <article class="render-option bad"><div class="option-icon"><div class="wire-cube"></div></div><h3>完整 Cube Mesh</h3><p>几何直观，但每个体素产生大量顶点和三角形，无法扩展到千万级。</p><span class="pill" style="background:var(--red-soft);color:var(--red)">REJECTED</span></article>
+          <article class="render-option bad"><div class="option-icon"><div class="half-cube"></div></div><h3>只画朝向相机的一半</h3><p>减少部分面，但提交量仍与体素数线性增长，性能改善有限。</p><span class="pill" style="background:var(--red-soft);color:var(--red)">REJECTED</span></article>
+          <article class="render-option good"><div class="option-icon"><div class="billboard-ray"><div class="plane"></div><div class="solid"></div><div class="ray"></div></div></div><h3>Billboard + Pixel Trace</h3><p>用平面保守覆盖屏幕区域，在 Pixel Shader 中做 Ray–Box 求交恢复立方体。</p><span class="pill">SELECTED</span></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Billboard 只是覆盖代理 · 真正的表面由片元重建</span><span>GDC 14–15</span></footer>
+    </section>
+
+    <section class="slide" data-title="体素块" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">15 · VOXEL BLOCK</p><h2>一次 Billboard 不只画一个体素，而是画 64 个</h2></div><span class="slide-no">17 / 41</span></header>
+      <div class="slide-body block-pack animate">
+        <div>
+          <div class="voxel-stack"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <p class="lead" style="text-align:center;margin-top:35px"><b>4 × 4 × 4 = 64</b><br>局部体素空间</p>
+        </div>
+        <div class="flow-arrow"></div>
+        <div class="block-billboard"><div class="voxel-stack"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      </div>
+      <div class="slide-body" style="padding-top:0"><p class="callout"><b>顶点摊销：</b>64 个体素共享一个 Quad，Block 固定只提交 4 顶点 / 2 三角形；体素数量不再决定顶点数量。</p></div>
+      <footer class="slide-foot"><span>1 Block = 1 Billboard = up to 64 Voxels</span><span>GDC 16</span></footer>
+    </section>
+
+    <section class="slide" data-title="体素块 LOD" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">16 · BLOCK LEVELS</p><h2>同一 Block 的三级表达与项目取舍</h2></div><span class="slide-no">18 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="lod-row">
+          <article class="lod-card disabled"><h3>Level-0 <span>GDC ONLY</span></h3><div class="lod-visual"><div class="lod-solid"></div></div><p>整个 Block 的 Bounding Box，最便宜但会把空区域视为实心。</p><div class="lod-note">项目移除：远距离切换时会产生几何膨胀与断裂。</div></article>
+          <article class="lod-card"><h3>Level-1 <span>8 bit</span></h3><div class="lod-visual"><div class="lod-grid-2"><i></i><i></i><i></i><i></i></div></div><p><b>2×2×2</b> 粗网格，一个 bit 表示一个 2³ 粗 Cell 是否包含体素。</p><div class="lod-note">当前项目：中远距离 DDA，最多 8 步。</div></article>
+          <article class="lod-card"><h3>Level-2 <span>64 bit</span></h3><div class="lod-visual"><div class="lod-grid-4"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><p><b>4×4×4</b> 精细网格，一个 bit 精确对应一个体素。</p><div class="lod-note">当前项目：近距离 DDA，最多 64 步。</div></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>当前项目 LOD2Distance = 600 · LOD1 参数保留但 Shader 合并为两级</span><span>LOD Contract</span></footer>
+    </section>
+
+    <section class="slide" data-title="数据层级" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">17 · DATA HIERARCHY</p><h2>从世界到 GPU：五层数据粒度</h2></div><span class="slide-no">19 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="data-hierarchy">
+          <article class="hierarchy-node"><div class="hierarchy-glyph">WORLD</div><strong>World Asset</strong><span>全局网格、原点、VoxelSize 与 Region 清单</span></article>
+          <article class="hierarchy-node"><div class="hierarchy-glyph">REGION</div><strong>Region</strong><span>建议 128³ 体素，作为离线烘焙和流式粒度</span></article>
+          <article class="hierarchy-node"><div class="hierarchy-glyph">CHUNK</div><strong>Chunk</strong><span>GDC 按 Q-Pid 区域组合多个 Voxel Block</span></article>
+          <article class="hierarchy-node"><div class="hierarchy-glyph">4³</div><strong>Sparse Block</strong><span>仅保存非空 Block，每个 Block 固定 128-bit Shape</span></article>
+          <article class="hierarchy-node"><div class="hierarchy-glyph">1³</div><strong>Occupied Voxel</strong><span>只为存在的体素保存 32-bit Render Data</span></article>
+        </div>
+        <p class="callout" style="margin-top:22px">运行时 Shader 不读取树结构：World / Region 在加载阶段整理，GPU 最终只消费连续的 BlockData 与 VoxelData。</p>
+      </div>
+      <footer class="slide-foot"><span>Storage hierarchy ≠ Shader traversal hierarchy</span><span>GDC 18–19</span></footer>
+    </section>
+
+    <section class="slide" data-title="内存模型" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">18 · MEMORY MODEL</p><h2>总内存由“非空 Block”和“占用体素”共同决定</h2></div><span class="slide-no">20 / 41</span></header>
+      <div class="slide-body memory-formula animate">
+        <div class="memory-equation">
+          <div class="formula-main">Bytes = <b>16 × B</b> + <b>4 × V</b></div>
+          <p><span class="mono">B</span> = 非空 Block 数，<span class="mono">V</span> = 占用体素数。</p>
+          <div class="formula-main" style="font-size:24px;margin-top:24px">Per Block = 128 bit<br>Per Voxel = 32 bit</div>
+          <p>空 Block 不进入 Buffer；空体素不保存属性。</p>
+        </div>
+        <div class="memory-bars">
+          <article class="memory-bar-card"><b><span>稀疏 · 8/64</span><span>48 B / Block</span></b><i style="--fill:19%"></i><span>16 B Shape + 8 × 4 B Attribute</span></article>
+          <article class="memory-bar-card"><b><span>半满 · 32/64</span><span>144 B / Block</span></b><i style="--fill:56%"></i><span>Shape 开销被更多体素摊薄</span></article>
+          <article class="memory-bar-card"><b><span>全满 · 64/64</span><span>272 B / Block</span></b><i style="--fill:100%"></i><span>16 B + 64 × 4 B</span></article>
+          <article class="memory-bar-card"><b><span>相对密集属性</span><span>省 0–240 B</span></b><i style="--fill:72%"></i><span>若固定为每 Block 64 个属性，始终需要 256 B 属性区</span></article>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>稀疏收益取决于 Occupancy · 数据报告直接记录 PackedDataBytes</span><span>Memory Budget</span></footer>
+    </section>
+
+    <section class="slide" data-title="双缓冲总览" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">19 · BUFFER OVERVIEW</p><h2>GPU 只需要两个连续 StructuredBuffer</h2></div><span class="slide-no">21 / 41</span></header>
+      <div class="slide-body buffer-overview animate">
+        <article class="buffer-card"><h3>BlockDataBuffer <span>4 × uint32 / Block</span></h3><p>描述 Block 在哪里、哪些 Cell 存在，以及属性流从哪里开始。</p><div class="word-stack"><div class="word-line"><span>WORD 0</span><b>CoarseMask + BlockIndex</b><span>32 bit</span></div><div class="word-line"><span>WORD 1</span><b>FineMask Low</b><span>32 bit</span></div><div class="word-line"><span>WORD 2</span><b>FineMask High</b><span>32 bit</span></div><div class="word-line"><span>WORD 3</span><b>RenderStartIndex</b><span>32 bit</span></div></div></article>
+        <div class="flow-arrow"></div>
+        <article class="buffer-card"><h3>VoxelDataBuffer <span>1 × uint32 / occupied voxel</span></h3><p>只保存存在体素的渲染属性，按 Block 和 LocalBit 升序紧凑排列。</p><div class="voxel-stream"><div class="voxel-word"><span class="r">R8</span><span class="g">G8</span><span class="b">B8</span><span class="x">Extra8</span></div><div class="voxel-word"><span class="r">R8</span><span class="g">G8</span><span class="b">B8</span><span class="x">Extra8</span></div><div class="voxel-word"><span class="r">R8</span><span class="g">G8</span><span class="b">B8</span><span class="x">Extra8</span></div></div><p class="mono" style="margin-top:18px">… compact attribute stream …</p></article>
+      </div>
+      <footer class="slide-foot"><span>StructuredBuffer&lt;uint&gt; · CPU 与 Shader 共享同一字节契约</span><span>Data Contract</span></footer>
+    </section>
+
+    <section class="slide" data-title="Word0 位规划" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">20 · WORD 0 LAYOUT</p><h2>Word 0：8-bit 粗形状 + 24-bit Block 地址</h2></div><span class="slide-no">22 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="bit-diagram">
+          <div class="bit-index-row"><span>bit 0</span><span>bit 7</span><span>bit 8</span><span>bit 31</span></div>
+          <div class="bit-ruler"><i class="coarse"></i><i class="coarse"></i><i class="coarse"></i><i class="coarse"></i><i class="coarse"></i><i class="coarse"></i><i class="coarse"></i><i class="coarse"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i><i class="location"></i></div>
+          <div class="bit-labels"><span class="coarse">[0..7] CoarseMask · 8 bit</span><span class="location">[8..31] BlockLinearIndex · 24 bit</span></div>
+          <div class="bit-details"><div class="bit-detail"><b>COARSE BIT</b><span><span class="mono">Cx | Cy&lt;&lt;1 | Cz&lt;&lt;2</span><br>每 bit 对应 2×2×2 的一个粗 Cell。</span></div><div class="bit-detail"><b>LOCATION</b><span><span class="mono">X + Y×Nx + Z×Nx×Ny</span><br>Shader 反解 Bx / By / Bz。</span></div><div class="bit-detail"><b>ADDRESS LIMIT</b><span>24 bit 最多寻址 <b>16,777,215</b> 个 Block；Builder 在烘焙前校验。</span></div></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>ShapeLevelAndLocation = CoarseMask | (BlockIndex &lt;&lt; 8)</span><span>32 bit</span></footer>
+    </section>
+
+    <section class="slide" data-title="精细占用掩码" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">21 · WORD 1–2 LAYOUT</p><h2>Word 1–2：64-bit 精细占用，恰好覆盖 4×4×4</h2></div><span class="slide-no">23 / 41</span></header>
+      <div class="slide-body mask-layout animate">
+        <div>
+          <div class="mask-grid"><i class="on">0</i><i>1</i><i class="on">2</i><i>3</i><i>4</i><i class="on">5</i><i>6</i><i>7</i><i>8</i><i class="on">9</i><i>10</i><i>11</i><i class="on">12</i><i>13</i><i>14</i><i class="on">15</i><i>16</i><i>17</i><i class="on">18</i><i>19</i><i>20</i><i class="on">21</i><i>22</i><i>23</i><i>24</i><i>25</i><i class="on">26</i><i>27</i><i>28</i><i>29</i><i class="on">30</i><i>31</i><i class="high">32</i><i>33</i><i class="high">34</i><i>35</i><i class="high">36</i><i>37</i><i>38</i><i class="high">39</i><i>40</i><i class="high">41</i><i>42</i><i>43</i><i>44</i><i class="high">45</i><i>46</i><i>47</i><i>48</i><i>49</i><i class="high">50</i><i>51</i><i>52</i><i>53</i><i>54</i><i class="high">55</i><i>56</i><i>57</i><i>58</i><i class="high">59</i><i>60</i><i>61</i><i>62</i><i class="high">63</i></div>
+          <div class="mask-legend"><span><i></i> MaskLow [0..31]</span><span><i class="high"></i> MaskHigh [32..63]</span></div>
+        </div>
+        <div>
+          <div class="formula">LocalBit = (Lx &amp; 3)<br>+ ((Ly &amp; 3) &lt;&lt; 2)<br>+ ((Lz &amp; 3) &lt;&lt; 4)</div>
+          <ul><li><b>Lx 最快</b>：X 每移动一格，bit +1。</li><li><b>Ly 次之</b>：Y 每移动一格，bit +4。</li><li><b>Lz 最慢</b>：Z 每移动一格，bit +16。</li><li>CPU 写入顺序和 Shader 解码必须完全一致。</li></ul>
+          <p class="callout">一个 bit 只表示“是否存在”，不直接存颜色；属性由紧凑 VoxelDataBuffer 提供。</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>ShapeMaskLow + ShapeMaskHigh = 64-bit occupancy</span><span>64 bit</span></footer>
+    </section>
+
+    <section class="slide" data-title="属性起始索引" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">22 · WORD 3 LAYOUT</p><h2>Word 3：32-bit 起始索引连接 Shape 与 Render Data</h2></div><span class="slide-no">24 / 41</span></header>
+      <div class="slide-body prefix-demo animate">
+        <div class="block-list"><div class="prefix-row"><span>Block A</span><i style="--fill:18%"></i><span>8 voxels</span></div><div class="prefix-row"><span>Block B</span><i style="--fill:52%"></i><span>23 voxels</span></div><div class="prefix-row"><span>Block C</span><i style="--fill:31%"></i><span>14 voxels</span></div><div class="prefix-row"><span>Block D</span><i style="--fill:70%"></i><span>31 voxels</span></div></div>
+        <div class="flow-arrow"></div>
+        <div class="packed-list"><div class="prefix-row"><span>Start A</span><b>0</b><span>[0..7]</span></div><div class="prefix-row"><span>Start B</span><b>8</b><span>[8..30]</span></div><div class="prefix-row"><span>Start C</span><b>31</b><span>[31..44]</span></div><div class="prefix-row"><span>Start D</span><b>45</b><span>[45..75]</span></div></div>
+      </div>
+      <div class="slide-body" style="padding-top:0"><div class="formula">RenderStartIndex(block N) = Σ OccupiedVoxelCount(block 0 … N−1)</div><p class="callout">每个 Block 占用数不同，不能用 <span class="mono">BlockIndex × 64</span>；必须保存前缀和起点。</p></div>
+      <footer class="slide-foot"><span>RenderStartIndex 指向 VoxelDataBuffer，而不是指向世界 Block</span><span>32 bit</span></footer>
+    </section>
+
+    <section class="slide" data-title="单体素属性" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">23 · VOXEL ATTRIBUTE</p><h2>每个占用体素只占一个 uint32</h2></div><span class="slide-no">25 / 41</span></header>
+      <div class="slide-body compare-contract animate">
+        <article class="contract-side gdc"><h3>GDC 原方案 <span>RGB + PBR</span></h3><div class="voxel-word"><span class="r">R · 8</span><span class="g">G · 8</span><span class="b">B · 8</span><span class="x">S/R · 8</span></div><ul><li>低 24 bit：RGB888。</li><li>高 8 bit：Specular Intensity 与 Roughness 打包。</li><li>每个 LOD 为现有体素保存对应 PBR 值。</li></ul><div class="attribute-example"><b>8-bit PBR 的意义</b><code>Specular + Roughness → 1 byte</code><span>演讲只确认二者共享剩余 8 bit，未公开各自具体分配。</span></div></article>
+        <article class="contract-side project"><h3>当前项目代码 <span>RGB24 + Extra8</span></h3><div class="voxel-word"><span class="r">R · 8</span><span class="g">G · 8</span><span class="b">B · 8</span><span class="x">Extra · 8</span></div><ul><li><span class="mono">[0..23]</span>：RGB。</li><li><span class="mono">[24..31]</span>：Material / Extra，语义暂未固定。</li><li>当前 Shader 只解码 RGB，Extra8 为后续材质扩展预留。</li></ul><div class="attribute-example project"><b>实际打包示例</b><code>R=34 G=78 B=A6 Extra=C0</code><code>PackedData = 0xC0A67834</code><span>位模式固定，Extra8 的业务含义可以后续升级。</span></div></article>
+      </div>
+      <footer class="slide-foot"><span>PackedData = R | G&lt;&lt;8 | B&lt;&lt;16 | Extra&lt;&lt;24</span><span>32 bit / occupied voxel</span></footer>
+    </section>
+
+    <section class="slide" data-title="稀疏属性寻址" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">24 · SPARSE ADDRESSING</p><h2>命中 bit 如何找到对应颜色</h2></div><span class="slide-no">26 / 41</span></header>
+      <div class="slide-body address-demo animate">
+        <div class="hit-mask"><p class="mono">HitBit = 18</p><div class="mask-grid"><i class="on">0</i><i>1</i><i class="on">2</i><i>3</i><i class="on">4</i><i>5</i><i>6</i><i class="on">7</i><i>8</i><i class="on">9</i><i>10</i><i>11</i><i class="on">12</i><i>13</i><i class="on">14</i><i>15</i><i>16</i><i>17</i><i class="on">18</i><i>19</i><i>20</i><i>21</i><i>22</i><i>23</i></div><p class="muted">18 之前共有 7 个占用 bit。</p></div>
+        <div class="flow-arrow"></div>
+        <div class="address-math"><code>Offset = PopCount(Mask &amp; BitsBelow(18))</code><code>Offset = 7</code><code>ColorIndex = RenderStartIndex + 7</code><p>属性流只包含存在体素，因此“命中位之前有几个 1”就是紧凑数组内偏移。</p></div>
+      </div>
+      <footer class="slide-foot"><span>ColorIndex = RenderStartIndex + PopCountBelow64(HitBit)</span><span>O(1) attribute fetch</span></footer>
+    </section>
+
+    <section class="slide" data-title="CPU 构建契约" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">25 · CPU BUILDER</p><h2>CPU 构建必须保证位序、属性序和前缀和一致</h2></div><span class="slide-no">27 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="builder-flow"><article class="builder-step"><span>01</span><b>网格对齐</b><small>GridSize 向上对齐到 4，保证完整 Block。</small></article><article class="builder-step"><span>02</span><b>定位 Block</b><small>Global Voxel → BlockIndex + LocalBit。</small></article><article class="builder-step"><span>03</span><b>过滤空块</b><small>仅保存 Mask ≠ 0 的 Block。</small></article><article class="builder-step"><span>04</span><b>LocalBit 排序</b><small>同一 Block 内按 bit 0→63 写属性。</small></article><article class="builder-step"><span>05</span><b>生成两级 Mask</b><small>Fine 64-bit + Coarse 8-bit。</small></article><article class="builder-step"><span>06</span><b>写前缀和</b><small>当前 VoxelData.Num() 即 StartIndex。</small></article></div>
+        <div class="builder-rule">CPU INVARIANT: BlockData.Num() = BlockCount × 4 ∧ VoxelData order = ascending LocalBit</div>
+      </div>
+      <footer class="slide-foot"><span>排序错误不会崩溃，却会让颜色映射到错误体素，因此必须在资产提交前 Validate</span><span>FVoxelMapDataBuilder</span></footer>
+    </section>
+
+    <section class="slide" data-title="GPU 上传" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">26 · GPU UPLOAD</p><h2>资产加载后一次上传，两条 SRV 每帧复用</h2></div><span class="slide-no">28 / 41</span></header>
+      <div class="slide-body gpu-path animate">
+        <article class="cpu-side"><h3>CPU / Asset <span>Persistent</span></h3><div class="transfer-stack"><div class="transfer-buffer"><b><span>BlockData[]</span><span>uint32 × 4B</span></b><small>位置、粗细占用、属性起点</small></div><div class="transfer-buffer"><b><span>VoxelData[]</span><span>uint32 × V</span></b><small>RGB24 + Extra8</small></div><div class="transfer-buffer"><b><span>Metadata</span><span>Grid / Origin / Size</span></b><small>重建世界坐标所需常量</small></div></div></article>
+        <div class="flow-arrow"></div>
+        <article class="gpu-side"><h3>GPU / RHI <span>BUF_Static</span></h3><div class="transfer-stack"><div class="transfer-buffer"><b><span>BlockDataBuffer SRV</span><span>StructuredBuffer&lt;uint&gt;</span></b><small>VS + PS 共同读取</small></div><div class="transfer-buffer"><b><span>VoxelDataBuffer SRV</span><span>StructuredBuffer&lt;uint&gt;</span></b><small>PS 命中后按 ColorIndex 读取</small></div><div class="transfer-buffer"><b><span>Shader Parameters</span><span>Per Frame</span></b><small>Camera、ViewProj、LOD、Frustum</small></div></div></article>
+      </div>
+      <footer class="slide-foot"><span>CreateStructuredBuffer(sizeof(uint32), …, BUF_ShaderResource | BUF_Static)</span><span>Runtime Boundary</span></footer>
+    </section>
+
+    <section class="slide" data-title="实例化 Billboard" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">27 · VERTEX STAGE</p><h2>每个非空 Block 生成一个 Billboard 实例</h2></div><span class="slide-no">29 / 41</span></header>
+      <div class="slide-body shader-split animate">
+        <div class="shader-codeflow"><article class="shader-node hot"><b>1 · SV_InstanceID</b><span>作为稀疏 Buffer 的 StorageIndex，读取 4 个 uint32。</span></article><article class="shader-node"><b>2 · 解码 BlockIndex</b><span>24-bit 线性地址 → Bx / By / Bz → 世界空间 AABB。</span></article><article class="shader-node"><b>3 · 视锥剔除</b><span>Block 包围球测试 6 个 Frustum Plane，完全在外则输出退化 Quad。</span></article><article class="shader-node hot"><b>4 · 相机朝向展开</b><span>沿 CameraRight / CameraUp 展开 4 顶点平面，保守覆盖 Block 投影。</span></article><article class="shader-node"><b>5 · 实例化绘制</b><span><span class="mono">2 triangles × BlockCount</span>，不是按体素发 Draw Call。</span></article></div>
+        <div class="instance-visual"><div class="instance-field"><i class="bill"></i><i class="bill"></i><i class="bill"></i><i class="bill"></i><i class="bill"></i></div></div>
+      </div>
+      <footer class="slide-foot"><span>DrawIndexedPrimitive · 4 vertices · 2 primitives · NumInstances = BlockCount</span><span>MainVS</span></footer>
+    </section>
+
+    <section class="slide" data-title="Ray Box 求交" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">28 · PIXEL STAGE A</p><h2>Billboard 像素先判断射线是否穿过 Block</h2></div><span class="slide-no">30 / 41</span></header>
+      <div class="slide-body raybox-stage animate">
+        <div class="raybox-visual"><div class="box3d"></div><div class="trace"></div><span class="enter">TEnter</span><span class="exit">TExit</span><span class="miss">Miss → discard</span></div>
+        <div><div class="formula">T0 = (BoxMin − O) / D<br>T1 = (BoxMax − O) / D<br><br>TEnter = max(min(T0,T1))<br>TExit = min(max(T0,T1))</div><ul><li><span class="mono">TEnter ≤ TExit</span> 且 <span class="mono">TExit ≥ 0</span> 才进入 DDA。</li><li>Billboard 的四角区域可能不命中 Block，必须 <span class="mono">discard</span>。</li><li>相机在 Box 内时，从 <span class="mono">max(TEnter, 0)</span> 开始。</li></ul></div>
+      </div>
+      <footer class="slide-foot"><span>Billboard coverage ≠ geometric hit</span><span>MainPS · Slab Test</span></footer>
+    </section>
+
+    <section class="slide" data-title="LOD 与 DDA" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">29 · PIXEL STAGE B</p><h2>按距离选择 8 步或 64 步 DDA</h2></div><span class="slide-no">31 / 41</span></header>
+      <div class="slide-body dda-board animate">
+        <div><h3 class="violet">中远距离 · Level-1</h3><div class="dda-grid coarse"><i class="path"></i><i class="empty"></i><i class="hit"></i><i class="empty"></i></div><p class="muted">2×2×2 粗 Cell，读取 8-bit CoarseMask，循环上限 8。</p></div>
+        <div><h3 class="accent">近距离 · Level-2</h3><div class="dda-grid"><i class="path"></i><i class="path empty"></i><i class="empty"></i><i></i><i class="empty"></i><i class="path"></i><i class="hit"></i><i></i><i></i><i></i><i class="empty"></i><i></i><i></i><i></i><i></i><i></i></div><p class="muted">4×4×4 精细 Cell，读取 64-bit FineMask，循环上限 64。</p></div>
+      </div>
+      <div class="slide-body" style="padding-top:0"><div class="formula">Ray–Box → Init Cell / Step / TMax / TDelta → Test Occupancy → Advance Nearest Axis → First Hit</div></div>
+      <footer class="slide-foot"><span>Dist &lt; 600 → Level-2 · Else → Level-1</span><span>3D DDA</span></footer>
+    </section>
+
+    <section class="slide" data-title="命中与属性读取" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">30 · PIXEL STAGE C</p><h2>首个命中体素决定颜色、法线与真实深度</h2></div><span class="slide-no">32 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="output-flow"><article class="output-node"><div class="output-icon">CELL</div><b>HitCell</b><span>DDA 找到首个占用 Cell</span></article><article class="output-node"><div class="output-icon">BIT</div><b>HitBit</b><span>x | y&lt;&lt;2 | z&lt;&lt;4</span></article><article class="output-node"><div class="output-icon">Σ1</div><b>ColorIndex</b><span>Start + PopCountBelow</span></article><article class="output-node"><div class="output-icon">RGB</div><b>Attribute</b><span>解包 RGB24 + Extra8</span></article><article class="output-node"><div class="output-icon">Z</div><b>SV_Depth</b><span>命中点投影到 Reverse-Z</span></article></div>
+        <div class="final-contract"><article class="card win"><strong>PHit</strong><h3>世界命中点</h3><p class="muted">Camera + RayDir × HitT</p></article><article class="card win"><strong>N</strong><h3>进入面法线</h3><p class="muted">由 DDA 跨越轴与方向决定</p></article><article class="card choice"><strong>RGB</strong><h3>基础颜色</h3><p class="muted">当前项目执行简单定向光照</p></article><article class="card choice"><strong>DEPTH</strong><h3>真实遮挡</h3><p class="muted">不使用 Billboard 平面深度</p></article></div>
+      </div>
+      <footer class="slide-foot"><span>Miss：discard · Hit：Color + SV_Depth</span><span>Attribute Fetch</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：Billboard 屏幕映射" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">31 · DETAIL A</p><h2>Billboard 先限定可能命中 Block 的像素</h2></div><span class="slide-no">33 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="svg-twin">
+          <div class="svg-panel"><img src="./assets/render-diagrams/step1-world.svg" alt="世界空间中的相机、Billboard 和 Block"><div class="svg-caption"><b>World</b><span>VS 展开相机朝向 Quad</span></div></div>
+          <div class="svg-panel"><img src="./assets/render-diagrams/step1-screen.svg" alt="屏幕空间的 Billboard 包围框和选中像素"><div class="svg-caption"><b>Screen</b><span>Rasterizer 产生候选 Pixel</span></div></div>
+        </div>
+        <div class="detail-pipeline"><span class="active">Billboard</span><span>Pixel Ray</span><span>Ray–Box</span><span>DDA</span><span>HitT</span><span>Normal</span><span>Attribute</span><span>Depth</span></div>
+      </div>
+      <footer class="slide-foot"><span>Billboard 不是表面 · 它只是 Block 在屏幕上的保守覆盖</span><span>SVG · Step 1</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：Slab 求交" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">32 · DETAIL B</p><h2>Ray–Box：三个轴区间求交得到有效射线段</h2></div><span class="slide-no">34 / 41</span></header>
+      <div class="slide-body svg-detail-grid animate">
+        <div class="svg-panel"><img src="./assets/render-diagrams/step2-ray.svg" alt="射线穿过 Block AABB，标记入点与出点"></div>
+        <div class="svg-explain"><div class="svg-panel contain" style="min-height:285px"><img src="./assets/render-diagrams/step2-slab.svg" alt="X Y Z Slab 区间合并" style="min-height:285px"></div><div class="svg-formula">T0 = (BoxMin − O) / D<br>T1 = (BoxMax − O) / D<br><strong>TEntry = max(min(T0,T1))</strong><br><strong>TExit = min(max(T0,T1))</strong></div><div class="svg-step good"><b>进入 DDA 的条件</b><span><code>TEntry ≤ TExit</code> 且 <code>TExit ≥ 0</code>。绿色线段就是后续允许访问的范围。</span></div></div>
+      </div>
+      <footer class="slide-foot"><span>只遍历 [TEntry, TExit] · 避免访问 Block 外部 Cell</span><span>SVG · Step 2</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：相机在盒内" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">33 · EDGE CASE</p><h2>相机位于 Block 内：从 Camera Cell 向前遍历</h2></div><span class="slide-no">35 / 41</span></header>
+      <div class="slide-body svg-detail-grid animate">
+<div class="svg-panel"><img src="./assets/render-diagrams/camera-inside-main.svg" alt="相机位于 Block AABB 内部的射线区间"></div>
+        <div class="svg-explain"><div class="svg-step warn"><b>几何入点在相机后方</b><span><code>TEntry &lt; 0 &lt; TExit</code>，不能沿负 t 回溯不可见体素。</span></div><div class="svg-formula"><strong>TStart = max(TEntry, 0)</strong><br>Cell = floor((O − BoxMin) / CellSize)</div><div class="svg-step good"><b>初始化规则</b><span>先测试 Camera Cell；若为空，再按 DDA 只向相机前方推进，最远不超过 <code>TExit</code>。</span></div><div class="svg-step violet"><b>覆盖规则</b><span>相机被 AABB 包围时，8 角投影不再可靠，需要保守视口覆盖或近裁面裁剪。</span></div></div>
+      </div>
+      <footer class="slide-foot"><span>Inside Box：TStart=0 · Test current cell · DDA forward only</span><span>SVG · Supplement</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：Miss 与 discard" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">34 · MISS BRANCHES</p><h2>Billboard 像素不等于几何命中：三类失败都 discard</h2></div><span class="slide-no">36 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="svg-panel wide"><img src="./assets/render-diagrams/miss-branches.svg" alt="Ray Box 无交、DDA 越界和遍历为空三类 Miss 分支"></div>
+        <div class="svg-twin" style="margin-top:14px"><div class="svg-step bad"><b>不写 SceneColor</b><span>没有 HitCell 时不生成体素颜色，保留原场景像素。</span></div><div class="svg-step bad"><b>不写 SV_Depth</b><span>否则 Billboard 平面会错误遮挡后方场景。</span></div></div>
+      </div>
+      <footer class="slide-foot"><span>Reject before DDA · Leave valid segment · No solid voxel → discard</span><span>SVG · Miss</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：3D DDA" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">35 · DETAIL C</p><h2>3D DDA 每轮只做比较、跨格与累加</h2></div><span class="slide-no">37 / 41</span></header>
+      <div class="slide-body svg-detail-grid animate">
+        <div class="svg-panel"><img src="./assets/render-diagrams/step3-grid.svg" alt="射线在 4×3×2 体素网格中的逐格路径"></div>
+        <div class="svg-explain"><div class="svg-panel contain" style="min-height:330px"><img src="./assets/render-diagrams/step3-iterations.svg" alt="DDA 每轮的 tMax 比较与累加" style="min-height:330px"></div><div class="svg-formula">AxisMask = abs(TMax − min(TMax)) ≤ ε<br>Cell += Step × AxisMask<br>TMax += TDelta × AxisMask</div><div class="svg-step good"><b>First Hit Wins</b><span>进入新 Cell 后测试对应 Occupancy bit；为 1 立即返回 <code>HitCell + HitT</code>。</span></div></div>
+      </div>
+      <footer class="slide-foot"><span>Level-1 最多 8 Cell · Level-2 最多 64 Cell</span><span>SVG · Step 3</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：多轴同时跨越" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">36 · DDA TIE BREAK</p><h2>穿过棱或角时，同步推进所有并列轴</h2></div><span class="slide-no">38 / 41</span></header>
+      <div class="slide-body svg-detail-grid animate">
+<div class="svg-panel"><img src="./assets/render-diagrams/multi-axis-main.svg" alt="XY 两轴同时跨面，直接进入对角体素"></div>
+        <div class="svg-explain"><div class="svg-step violet"><b>问题来源</b><span><code>TMaxX == TMaxY</code> 表示射线正穿过共享棱；只选一个轴会产生轴优先级偏差。</span></div><div class="svg-formula">TNext = min(TMax.xyz)<br><strong>Mask = abs(TMax − TNext) ≤ ε</strong><br>Cell += Step × Mask</div><div class="svg-step good"><b>当前项目建议</b><span>使用 thin-ray 语义，只测试最终对角 Cell；法线采用固定 tie-break，保证结果确定。</span></div><div class="svg-step warn"><b>若需要 Conservative</b><span>可测试所有侧邻，但必须规定稳定顺序，否则多个 Solid 会产生不确定命中。</span></div></div>
+      </div>
+      <footer class="slide-foot"><span>2-axis = edge · 3-axis = corner · relative epsilon</span><span>SVG · Supplement</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：HitT 与深度" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">37 · DETAIL D</p><h2>HitT 先重建世界命中点，再写 Reverse-Z 深度</h2></div><span class="slide-no">39 / 41</span></header>
+      <div class="slide-body animate">
+        <div class="svg-twin"><div class="svg-panel contain"><img src="./assets/render-diagrams/step4-hit.svg" alt="由 HitT 重建真实体素命中点"><div class="svg-caption"><b>1 · World Hit</b><span>PHit = O + HitT × D</span></div></div><div class="svg-panel contain"><img src="./assets/render-diagrams/step4-depth.svg" alt="命中点投影为 Reverse-Z 深度"><div class="svg-caption"><b>2 · Pixel Depth</b><span>Clip.z / Clip.w → SV_Depth</span></div></div></div>
+        <div class="detail-pipeline"><span>Billboard</span><span>Pixel Ray</span><span>Ray–Box</span><span>DDA</span><span class="active">HitT</span><span>Normal</span><span>Attribute</span><span class="active">Depth</span></div>
+      </div>
+      <footer class="slide-foot"><span>禁止写 Billboard 平面深度 · 必须写体素真实表面深度</span><span>SVG · Step 4</span></footer>
+    </section>
+
+    <section class="slide svg-detail" data-title="详细流程：法线与属性" aria-hidden="true">
+      <header class="slide-head"><div><p class="eyebrow">38 · DETAIL E</p><h2>进入面给出法线，命中 bit 给出属性地址</h2></div><span class="slide-no">40 / 41</span></header>
+      <div class="slide-body svg-detail-grid equal animate">
+        <div><div class="svg-panel"><img src="./assets/render-diagrams/step5-face.svg" alt="由最后一次 DDA 跨面确定体素法线"></div><div class="svg-step good" style="margin-top:12px"><b>Normal</b><span><code>NLocal = −Step[Axis] × AxisUnit</code>，再转换到世界空间参与光照。</span></div></div>
+        <div><div class="svg-panel"><img src="./assets/render-diagrams/step6-hit-cell.svg" alt="DDA 命中 Cell 与体素记录寻址"></div><div class="svg-step violet" style="margin-top:12px"><b>当前项目属性地址</b><span><code>HitBit = x | y&lt;&lt;2 | z&lt;&lt;4</code><br><code>ColorIndex = RenderStartIndex + PopCountBelow64(HitBit)</code></span></div></div>
+      </div>
+      <footer class="slide-foot"><span>SVG 只复用命中 Cell 图形 · 属性寻址以当前稀疏 Buffer 契约为准</span><span>SVG · Step 5–6</span></footer>
+    </section>
+
+    <section class="slide hero" data-title="渲染闭环" aria-hidden="true">
+      <div class="slide-body animate">
+        <p class="eyebrow">39 · COMPLETE PIPELINE</p>
+        <p class="quote">一份紧凑数据同时回答三个问题：<span class="accent">Block 在哪里</span>、<span class="accent">哪些体素存在</span>、<span class="accent">命中后去哪里读属性</span>。</p>
+        <div class="render-chain" style="margin-top:32px"><span>Point Grid</span><span>Block Builder</span><span>BlockData SRV</span><span>VoxelData SRV</span><span>Billboard DDA</span><span>RT + Depth</span></div>
+        <div class="grid-3" style="width:100%;margin-top:28px"><article class="card win"><h3>128 bit / Block</h3><p class="muted">8-bit 粗 Mask + 24-bit 位置 + 64-bit 精细 Mask + 32-bit 属性起点。</p></article><article class="card win"><h3>32 bit / Voxel</h3><p class="muted">RGB24 + Extra8，仅为占用体素保存。</p></article><article class="card choice"><h3>4 Vertices / Block</h3><p class="muted">Pixel Shader 通过 Ray–Box 与 DDA 重建最多 64 个体素。</p></article></div>
+      </div>
+      <div class="slide-foot"><span>DS2 Voxel Map · Sampling + Data Packing + Rendering</span><span>41 / 41</span></div>
+    </section>
+  </main>
+
+  <nav class="nav" aria-label="幻灯片导航"><button data-prev title="上一页（←）" aria-label="上一页">←</button><span class="counter"><span data-current>01</span> / <span data-total>41</span></span><button data-next title="下一页（→）" aria-label="下一页">→</button><button data-fullscreen title="全屏（F）" aria-label="全屏">⛶</button></nav>
+  <div class="hint">← → 翻页 · F 全屏 · P 打印/PDF</div>
+  <script src="./voxel-capture-deck.js"></script>
+</body>
+</html>

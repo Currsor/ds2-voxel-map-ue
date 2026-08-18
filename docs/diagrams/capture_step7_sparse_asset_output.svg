@@ -1,0 +1,197 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08111f"/>
+      <stop offset="1" stop-color="#101b31"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#16b8d4"/>
+      <stop offset="1" stop-color="#4ce1c1"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7467f0"/>
+      <stop offset="1" stop-color="#aa77ff"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#16a879"/>
+      <stop offset="1" stop-color="#55df9e"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000814" flood-opacity="0.42"/>
+    </filter>
+    <marker id="arrowCyan" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#36d6cb"/>
+    </marker>
+    <marker id="arrowViolet" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#9a7bff"/>
+    </marker>
+    <style>
+      .t { font-family: "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif; fill: #eef6ff; }
+      .muted { fill: #91a4bd; }
+      .small { font-size: 16px; }
+      .body { font-size: 18px; }
+      .label { font-size: 19px; font-weight: 700; }
+      .code { font-family: Consolas, "Microsoft YaHei", monospace; font-size: 15px; fill: #c9dbef; }
+      .card { fill: #111f35; stroke: #29405e; stroke-width: 2; }
+      .soft { fill: #0d192b; stroke: #223a58; stroke-width: 1.5; }
+      .cell { stroke: #08111f; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#bg)"/>
+  <circle cx="1430" cy="80" r="270" fill="#173157" opacity="0.22"/>
+  <circle cx="110" cy="1110" r="280" fill="#0e716f" opacity="0.10"/>
+
+  <text class="t" x="70" y="72" font-size="38" font-weight="800">第 7 步｜稀疏数据构建与资产输出</text>
+  <text class="t muted" x="70" y="110" font-size="20">最终颜色 → 4×4×4 Block 压缩 → 数据验证 → 单资产 / 分区资产 → 预览刷新与 M7 验收</text>
+  <rect x="70" y="136" width="1460" height="4" rx="2" fill="url(#cyan)" opacity="0.8"/>
+
+  <g filter="url(#shadow)">
+    <rect class="card" x="70" y="178" width="340" height="620" rx="24"/>
+    <rect class="card" x="445" y="178" width="420" height="620" rx="24"/>
+    <rect class="card" x="900" y="178" width="630" height="620" rx="24"/>
+  </g>
+
+  <rect x="94" y="200" width="142" height="36" rx="18" fill="#153b51"/>
+  <text class="t label" x="165" y="225" text-anchor="middle" fill="#48d8d0">阶段 1</text>
+  <text class="t" x="94" y="278" font-size="27" font-weight="800">颜色定稿</text>
+  <text class="t muted small" x="94" y="309">累加状态 → 可存储的源体素</text>
+
+  <rect class="soft" x="94" y="340" width="292" height="126" rx="16"/>
+  <text class="t label" x="116" y="373">FCaptureAccumulator</text>
+  <text class="t code" x="116" y="403">WeightedLinearColorSum</text>
+  <text class="t code" x="116" y="429">TotalWeight</text>
+  <text class="t code" x="116" y="455">Voxel LinearIndex</text>
+
+  <line x1="240" y1="478" x2="240" y2="524" stroke="#36d6cb" stroke-width="4" marker-end="url(#arrowCyan)"/>
+
+  <rect x="94" y="538" width="292" height="112" rx="16" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+  <text class="t code" x="116" y="570">Average = WeightedSum / Weight</text>
+  <text class="t code" x="116" y="600">Linear → Clamp → sRGB8</text>
+  <text class="t small" x="116" y="632" fill="#70e3c7">在线性空间融合，最后才转 sRGB</text>
+
+  <g transform="translate(94 680)">
+    <rect width="292" height="88" rx="16" fill="#241f41" stroke="#826ef0" stroke-width="2"/>
+    <rect x="20" y="18" width="58" height="52" rx="9" fill="#d57a58"/>
+    <text class="t label" x="49" y="51" text-anchor="middle">RGB</text>
+    <text class="t label" x="98" y="37">FVoxelMapSourceVoxel</text>
+    <text class="t code" x="98" y="62">Coordinate + PackedData</text>
+    <text class="t small" x="98" y="81">R | G&lt;&lt;8 | B&lt;&lt;16 | Extra&lt;&lt;24</text>
+  </g>
+
+  <rect x="469" y="200" width="142" height="36" rx="18" fill="#26355e"/>
+  <text class="t label" x="540" y="225" text-anchor="middle" fill="#aa91ff">阶段 2</text>
+  <text class="t" x="469" y="278" font-size="27" font-weight="800">稀疏 Block 构建</text>
+  <text class="t muted small" x="469" y="309">只保存非空 Block 与其中的占用体素</text>
+
+  <g transform="translate(481 344)">
+    <text class="t small" x="0" y="0">一个 4×4×4 Block：64 个局部位置</text>
+    <g transform="translate(0 20)">
+      <rect class="cell" x="0" y="0" width="34" height="34" rx="4" fill="#36d6cb"/><rect class="cell" x="38" y="0" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="76" y="0" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="114" y="0" width="34" height="34" rx="4" fill="#9a7bff"/>
+      <rect class="cell" x="0" y="38" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="38" y="38" width="34" height="34" rx="4" fill="#f59e0b"/><rect class="cell" x="76" y="38" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="114" y="38" width="34" height="34" rx="4" fill="#233a52"/>
+      <rect class="cell" x="0" y="76" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="38" y="76" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="76" y="76" width="34" height="34" rx="4" fill="#55df9e"/><rect class="cell" x="114" y="76" width="34" height="34" rx="4" fill="#233a52"/>
+      <rect class="cell" x="0" y="114" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="38" y="114" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="76" y="114" width="34" height="34" rx="4" fill="#233a52"/><rect class="cell" x="114" y="114" width="34" height="34" rx="4" fill="#e56b73"/>
+    </g>
+    <g transform="translate(180 25)">
+      <text class="t label" x="0" y="20">两级占用描述</text>
+      <text class="t code" x="0" y="51">CoarseMask：8 bit</text>
+      <text class="t small" x="0" y="74">2×2×2 粗 Cell 快速跳空</text>
+      <text class="t code" x="0" y="105">ShapeMask：64 bit</text>
+      <text class="t small" x="0" y="128">精确表示 4×4×4 占用</text>
+    </g>
+  </g>
+
+  <rect class="soft" x="469" y="534" width="372" height="130" rx="16"/>
+  <text class="t label" x="491" y="566">每个非空 Block：4 × uint32 = 16 Bytes</text>
+  <text class="t code" x="491" y="596">Word 0：CoarseMask[8] + BlockIndex[24]</text>
+  <text class="t code" x="491" y="622">Word 1～2：ShapeMask Low / High</text>
+  <text class="t code" x="491" y="648">Word 3：RenderStartIndex</text>
+
+  <rect x="469" y="684" width="372" height="84" rx="16" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+  <text class="t label" x="491" y="714" fill="#70e3c7">紧凑 VoxelData</text>
+  <text class="t code" x="491" y="740">仅写占用体素；每个 PackedData = 4 Bytes</text>
+  <text class="t small" x="491" y="762">BlockIndex 与 LocalBit 排序 → 稳定输出</text>
+
+  <rect x="924" y="200" width="142" height="36" rx="18" fill="#183f45"/>
+  <text class="t label" x="995" y="225" text-anchor="middle" fill="#70e3c7">阶段 3</text>
+  <text class="t" x="924" y="278" font-size="27" font-weight="800">验证并提交资产</text>
+  <text class="t muted small" x="924" y="309">同一份 SourceVoxels，根据输出模式进入两条路径</text>
+
+  <rect class="soft" x="924" y="340" width="582" height="72" rx="16"/>
+  <text class="t label" x="1215" y="371" text-anchor="middle">FVoxelMapDataBuilder::Build → FVoxelMapGenerator::Validate</text>
+  <text class="t small" x="1215" y="397" text-anchor="middle" fill="#ff9d94">验证失败：不提交，避免 Shader 读取无效布局</text>
+
+  <line x1="1215" y1="414" x2="1215" y2="458" stroke="#36d6cb" stroke-width="4" marker-end="url(#arrowCyan)"/>
+  <line x1="1215" y1="458" x2="1072" y2="458" stroke="#36d6cb" stroke-width="3"/>
+  <line x1="1215" y1="458" x2="1360" y2="458" stroke="#9a7bff" stroke-width="3"/>
+
+  <g transform="translate(924 474)">
+    <rect width="270" height="222" rx="18" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+    <text class="t label" x="135" y="36" text-anchor="middle" fill="#70e3c7">单资产模式</text>
+    <text class="t code" x="20" y="68">bWritePartitioned = false</text>
+    <rect x="20" y="87" width="230" height="58" rx="12" fill="#153b51"/>
+    <text class="t label" x="135" y="122" text-anchor="middle">OutputDataAsset</text>
+    <text class="t small" x="20" y="173">完整网格 + 稀疏数据 + 元数据</text>
+    <text class="t small" x="20" y="198">MarkPackageDirty，需要编辑器保存</text>
+  </g>
+
+  <g transform="translate(1236 474)">
+    <rect width="270" height="222" rx="18" fill="#241f41" stroke="#826ef0" stroke-width="2"/>
+    <text class="t label" x="135" y="36" text-anchor="middle" fill="#b9a6ff">分区世界模式</text>
+    <text class="t code" x="20" y="68">bWritePartitioned = true</text>
+    <rect x="20" y="87" width="230" height="58" rx="12" fill="#26355e"/>
+    <text class="t label" x="135" y="113" text-anchor="middle">OutputWorldAsset</text>
+    <text class="t small" x="135" y="136" text-anchor="middle">→ Regions/R_X_Y_Z</text>
+    <text class="t small" x="20" y="173">RegionSize 对齐 4，再局部构建</text>
+    <text class="t small" x="20" y="198">Region 按 Z → Y → X 稳定排序</text>
+  </g>
+
+  <rect x="924" y="720" width="582" height="48" rx="14" fill="#183f45" stroke="#2aaea8" stroke-width="2"/>
+  <text class="t label" x="1215" y="751" text-anchor="middle" fill="#70e3c7">绑定 PreviewRenderer → ReloadVoxelMapAsset() → 立即刷新预览</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="838" width="1460" height="238" rx="24" fill="#0d192b" stroke="#29405e" stroke-width="2"/>
+  </g>
+  <rect x="94" y="860" width="156" height="36" rx="18" fill="#4b3218"/>
+  <text class="t label" x="172" y="885" text-anchor="middle" fill="#ffca78">M7 质量门禁</text>
+  <text class="t muted small" x="270" y="884">资产成功提交后计算报告，并写回 LastBakeReport</text>
+
+  <g transform="translate(94 920)">
+    <rect width="300" height="112" rx="16" fill="#111f35" stroke="#29405e"/>
+    <text class="t label" x="22" y="32" fill="#70e3c7">数据有效性</text>
+    <text class="t code" x="22" y="60">Validate(BlockData, VoxelData)</text>
+    <text class="t small" x="22" y="88">Block 数、占用数、数据体积</text>
+  </g>
+  <g transform="translate(414 920)">
+    <rect width="300" height="112" rx="16" fill="#111f35" stroke="#29405e"/>
+    <text class="t label" x="22" y="32" fill="#48d8d0">覆盖率</text>
+    <text class="t code" x="22" y="60">Occupied / Candidate × 100%</text>
+    <text class="t small" x="22" y="88">必须达到 MinimumCoverage</text>
+  </g>
+  <g transform="translate(734 920)">
+    <rect width="300" height="112" rx="16" fill="#111f35" stroke="#29405e"/>
+    <text class="t label" x="22" y="32" fill="#b9a6ff">位置误差</text>
+    <text class="t code" x="22" y="60">MeanErrorCm / VoxelSize</text>
+    <text class="t small" x="22" y="88">不得超过最大体素量化误差</text>
+  </g>
+  <g transform="translate(1054 920)">
+    <rect width="452" height="112" rx="16" fill="#111f35" stroke="#29405e"/>
+    <text class="t label" x="22" y="32" fill="#ffca78">确定性 Hash</text>
+    <text class="t code" x="22" y="60">CurrentDataHash == PreviousDataHash</text>
+    <text class="t small" x="22" y="88">存在历史基线时必须一致；可输出 JSON 报告</text>
+  </g>
+
+  <rect x="94" y="1048" width="1412" height="52" rx="14" fill="#102b35" stroke="#2aaea8" stroke-width="2"/>
+  <text class="t label" x="800" y="1081" text-anchor="middle" fill="#70e3c7">OverallPass = DataValid ∧ CoveragePass ∧ PositionErrorPass ∧ DeterministicHashPass</text>
+
+  <g>
+    <text class="t muted small" x="70" y="1154">入口  →  视图  →  GPU 采集  →  像素重建  →  体素融合  →  清理  →</text>
+    <rect x="744" y="1122" width="176" height="46" rx="23" fill="url(#green)"/>
+    <text class="t label" x="832" y="1153" text-anchor="middle" fill="#071b14">资产输出</text>
+    <text class="t muted" x="1530" y="1154" text-anchor="end" font-size="15">DS2 Voxel Map · Capture Pipeline</text>
+  </g>
+</svg>

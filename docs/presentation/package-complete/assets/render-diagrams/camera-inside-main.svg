@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="794" height="590" viewBox="62 148 794 590">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="1" stop-color="#111a2e"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#172238" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#101827" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="cubeTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7dd3fc" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0.10"/>
+    </linearGradient>
+    <linearGradient id="cubeFront" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0284c7" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#0369a1" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="cubeSide" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#075985" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#0c4a6e" stop-opacity="0.08"/>
+    </linearGradient>
+    <filter id="glowAmber" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#4ade80"/>
+    </marker>
+    <style>
+      .title { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 700; fill: #f8fafc; }
+      .label { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 600; fill: #e2e8f0; }
+      .body { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #94a3b8; }
+      .mono { font-family: Consolas, "SFMono-Regular", monospace; fill: #cbd5e1; }
+      .cyan { fill: #22d3ee; }
+      .amber { fill: #fbbf24; }
+      .green { fill: #4ade80; }
+      .red { fill: #fb7185; }
+      .violet { fill: #a78bfa; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <circle cx="1310" cy="100" r="230" fill="#0ea5e9" opacity="0.05"/>
+  <circle cx="80" cy="850" r="260" fill="#8b5cf6" opacity="0.04"/>
+
+  <text x="72" y="76" class="title" font-size="34">补充 · 相机位于 Box 内：从 Camera Cell 向出点单向遍历</text>
+  <text x="72" y="111" class="body" font-size="17">此时几何入点在相机后方；将有效起点钳制到 t = 0，并保证 Billboard 对视口采取保守覆盖</text>
+
+  <rect x="62" y="148" width="794" height="590" rx="22" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="884" y="148" width="494" height="590" rx="22" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+
+  <circle cx="94" cy="188" r="14" fill="#22d3ee" opacity="0.16"/>
+  <text x="94" y="194" class="label cyan" font-size="15" text-anchor="middle">1</text>
+  <text x="120" y="195" class="title" font-size="22">射线原点已经在 Block AABB 内</text>
+  <text x="812" y="195" class="mono" font-size="14" text-anchor="end">insideBox = true</text>
+
+  <g>
+    <polygon points="238,358 502,267 714,357 445,454" fill="url(#cubeTop)" stroke="#7dd3fc" stroke-width="2"/>
+    <polygon points="238,358 445,454 445,655 238,550" fill="url(#cubeFront)" stroke="#38bdf8" stroke-width="2"/>
+    <polygon points="445,454 714,357 714,552 445,655" fill="url(#cubeSide)" stroke="#0ea5e9" stroke-width="2"/>
+    <g fill="none" stroke="#3b516a" stroke-width="1.1" stroke-dasharray="7 6" opacity="0.65">
+      <path d="M502 267 V462 M502 462 L714 552 M502 462 L238 550"/>
+      <path d="M370 313 V605 M608 312 V591"/>
+      <path d="M238 454 L445 555 L714 455"/>
+      <path d="M304 335 L511 431 L511 630 M436 290 L643 381 L643 579"/>
+    </g>
+    <g fill="none" stroke="#536b84" stroke-width="1.1" opacity="0.72">
+      <path d="M304 389 L568 298 M370 420 L634 329"/>
+      <path d="M307 585 L307 389 M376 620 L376 421 M512 630 L512 430 M579 604 L579 406 M646 578 L646 382"/>
+    </g>
+    <text x="472" y="694" class="label cyan" font-size="15" text-anchor="middle">Block AABB · 遮挡边与内部网格使用虚线</text>
+  </g>
+
+  <g transform="translate(414 473)">
+    <path d="M0 0 L34 -20 L34 20 Z" fill="#1e293b" stroke="#cbd5e1" stroke-width="1.8"/>
+    <rect x="-18" y="-14" width="24" height="28" rx="5" fill="#334155" stroke="#cbd5e1" stroke-width="1.8"/>
+    <circle cx="6" cy="0" r="7" fill="#fbbf24" filter="url(#glowAmber)"/>
+  </g>
+  <rect x="316" y="508" width="165" height="58" rx="9" fill="#422006" stroke="#92400e"/>
+  <text x="331" y="532" class="label amber" font-size="14">Camera / Ray Origin</text>
+  <text x="331" y="553" class="mono" font-size="12">O ∈ AABB · t = 0</text>
+  <path d="M400 508 L418 487" stroke="#fbbf24" stroke-width="1.4"/>
+
+  <path d="M287 568 L689 349" fill="none" stroke="#fbbf24" stroke-width="2.8" marker-end="url(#arrowAmber)" opacity="0.94"/>
+  <path d="M420 476 L650 371" fill="none" stroke="#4ade80" stroke-width="7" stroke-linecap="round" opacity="0.90" filter="url(#glowGreen)"/>
+  <path d="M287 568 L420 476" fill="none" stroke="#fb7185" stroke-width="3" stroke-dasharray="8 6" opacity="0.72"/>
+
+  <circle cx="287" cy="568" r="8" fill="#fb7185" stroke="#ffe4e6" stroke-width="2"/>
+  <circle cx="420" cy="476" r="9" fill="#fbbf24" stroke="#fef3c7" stroke-width="2"/>
+  <circle cx="650" cy="371" r="9" fill="#4ade80" stroke="#dcfce7" stroke-width="2"/>
+
+  <rect x="116" y="578" width="174" height="61" rx="9" fill="#3f0d18" stroke="#be123c"/>
+  <text x="132" y="602" class="label red" font-size="14">几何入点在相机后方</text>
+  <text x="132" y="624" class="mono" font-size="12">tEntry = -2.3</text>
+  <path d="M268 578 L283 570" stroke="#fb7185" stroke-width="1.4"/>
+
+  <rect x="624" y="274" width="161" height="61" rx="9" fill="#052e1a" stroke="#15803d"/>
+  <text x="640" y="298" class="label green" font-size="14">前方有效出点</text>
+  <text x="640" y="320" class="mono" font-size="12">tExit = 4.1</text>
+  <path d="M680 335 L654 367" stroke="#4ade80" stroke-width="1.4"/>
+
+  <rect x="100" y="230" width="352" height="74" rx="11" fill="#082f49" stroke="#0e7490"/>
+  <text x="121" y="256" class="label cyan" font-size="15">有效射线段不再从 Pentry 开始</text>
+  <text x="121" y="282" class="mono" font-size="14">tStart = max(tEntry, 0) = 0</text>
+  <path d="M356 305 L416 456" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+  <circle cx="916" cy="188" r="14" fill="#22d3ee" opacity="0.16"/>
+  <text x="916" y="194" class="label cyan" font-size="15" text-anchor="middle">2</text>
+  <text x="942" y="195" class="title" font-size="22">特殊分支处理</text>
+
+  <rect x="918" y="224" width="426" height="84" rx="12" fill="#16142b" stroke="#7c3aed"/>
+  <text x="940" y="250" class="label violet" font-size="15">屏幕覆盖：不要只投影 8 个角点</text>
+  <text x="940" y="274" class="mono" font-size="13">if (Camera ∈ AABB) → conservative viewport</text>
+  <text x="940" y="295" class="body" font-size="12">相机被包围时可使用全屏三角形或近裁面保守裁剪</text>
+
+  <path d="M1131 309 V333" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+  <rect x="918" y="342" width="426" height="88" rx="12" fill="#082f49" stroke="#0e7490"/>
+  <text x="940" y="368" class="label cyan" font-size="15">Ray–Box：保留正向半射线</text>
+  <text x="940" y="393" class="mono" font-size="13">tEntry &lt; 0 &lt; tExit</text>
+  <text x="940" y="415" class="mono cyan" font-size="13">tStart = 0 · valid = [0, tExit]</text>
+
+  <path d="M1131 431 V455" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+  <rect x="918" y="464" width="426" height="105" rx="12" fill="#19261d" stroke="#15803d"/>
+  <text x="940" y="490" class="label green" font-size="15">DDA：直接初始化 Camera Cell</text>
+  <text x="940" y="515" class="mono" font-size="13">cell = floor((O - boxMin) / cellSize)</text>
+  <text x="940" y="539" class="mono green" font-size="13">先 test(cell)，再比较并推进 tMax</text>
+  <text x="940" y="558" class="body" font-size="12">若当前 cell 为空，继续向相机前方体素步进</text>
+
+  <path d="M1131 570 V594" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+
+  <rect x="918" y="603" width="426" height="101" rx="12" fill="#3f0d18" stroke="#be123c"/>
+  <text x="940" y="630" class="label red" font-size="15">终止条件保持不变</text>
+  <text x="940" y="655" class="mono" font-size="13">hit solid → return Hit</text>
+  <text x="940" y="679" class="mono red" font-size="13">min(tMax) &gt; tExit 且仍为空 → discard</text>
+  <text x="940" y="697" class="body" font-size="12">绝不沿负 t 回溯相机后方体素</text>
+
+  <rect x="62" y="772" width="1316" height="82" rx="15" fill="#0c1628" stroke="#1e3a5f"/>
+  <text x="88" y="803" class="label" font-size="16">核心差异</text>
+  <g font-size="13">
+    <rect x="190" y="788" width="253" height="48" rx="10" fill="#3f0d18" stroke="#be123c"/>
+    <text x="316" y="808" class="mono red" text-anchor="middle">tEntry &lt; 0</text>
+    <text x="316" y="827" class="body" text-anchor="middle">外部入点位于相机后方</text>
+    <path d="M451 812 H491" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+    <rect x="501" y="788" width="285" height="48" rx="10" fill="#0f2538" stroke="#0e7490"/>
+    <text x="643" y="808" class="mono cyan" text-anchor="middle">tStart = max(tEntry, 0)</text>
+    <text x="643" y="827" class="body" text-anchor="middle">从 Camera Origin 开始</text>
+    <path d="M794 812 H834" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)"/>
+    <rect x="844" y="788" width="488" height="48" rx="10" fill="#19261d" stroke="#15803d"/>
+    <text x="1088" y="808" class="mono green" text-anchor="middle">test camera cell → DDA forward → hit / discard</text>
+    <text x="1088" y="827" class="body" text-anchor="middle">只处理 t ≥ 0 的可见半射线，最远不超过 tExit</text>
+  </g>
+</svg>

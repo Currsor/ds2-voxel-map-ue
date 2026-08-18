@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fafafa"/><stop offset="1" stop-color="#f5f3ff"/></linearGradient>
+    <marker id="arrowPurple" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#7c3aed"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-opacity=".12"/></filter>
+  </defs>
+  <rect width="1200" height="700" rx="24" fill="url(#bg)"/>
+  <text x="48" y="58" font-family="Microsoft YaHei, sans-serif" font-size="30" font-weight="700" fill="#0f172a">入口 3 · XYZ 切片采集</text>
+  <text x="48" y="92" font-family="Microsoft YaHei, sans-serif" font-size="17" fill="#475569">沿每个启用轴逐层移动正交相机 · 每次任务只接受当前 Slab 内的重建点</text>
+  <rect x="58" y="122" width="1084" height="502" rx="18" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <g font-family="Microsoft YaHei, sans-serif">
+    <text x="205" y="165" text-anchor="middle" font-size="19" font-weight="700" fill="#7c3aed">X 轴切片</text>
+    <text x="600" y="165" text-anchor="middle" font-size="19" font-weight="700" fill="#7c3aed">Y 轴切片</text>
+    <text x="995" y="165" text-anchor="middle" font-size="19" font-weight="700" fill="#7c3aed">Z 轴切片</text>
+  </g>
+  <g fill="#f8fafc" stroke="#64748b" stroke-width="2">
+    <rect x="90" y="215" width="230" height="260"/><rect x="485" y="215" width="230" height="260"/><rect x="880" y="215" width="230" height="260"/>
+  </g>
+  <g stroke="#cbd5e1" stroke-width="1" stroke-dasharray="5 5">
+    <line x1="136" y1="215" x2="136" y2="475"/><line x1="182" y1="215" x2="182" y2="475"/><line x1="228" y1="215" x2="228" y2="475"/><line x1="274" y1="215" x2="274" y2="475"/>
+    <line x1="90" y1="267" x2="320" y2="267"/><line x1="90" y1="319" x2="320" y2="319"/><line x1="90" y1="371" x2="320" y2="371"/><line x1="90" y1="423" x2="320" y2="423"/>
+    <line x1="531" y1="215" x2="531" y2="475"/><line x1="577" y1="215" x2="577" y2="475"/><line x1="623" y1="215" x2="623" y2="475"/><line x1="669" y1="215" x2="669" y2="475"/>
+    <line x1="485" y1="267" x2="715" y2="267"/><line x1="485" y1="319" x2="715" y2="319"/><line x1="485" y1="371" x2="715" y2="371"/><line x1="485" y1="423" x2="715" y2="423"/>
+    <line x1="926" y1="215" x2="926" y2="475"/><line x1="972" y1="215" x2="972" y2="475"/><line x1="1018" y1="215" x2="1018" y2="475"/><line x1="1064" y1="215" x2="1064" y2="475"/>
+    <line x1="880" y1="267" x2="1110" y2="267"/><line x1="880" y1="319" x2="1110" y2="319"/><line x1="880" y1="371" x2="1110" y2="371"/><line x1="880" y1="423" x2="1110" y2="423"/>
+  </g>
+  <rect x="180" y="215" width="48" height="260" fill="#8b5cf6" fill-opacity=".22" stroke="#7c3aed" stroke-width="3"/>
+  <rect x="485" y="317" width="230" height="56" fill="#8b5cf6" fill-opacity=".22" stroke="#7c3aed" stroke-width="3"/>
+  <rect x="972" y="215" width="48" height="260" fill="#8b5cf6" fill-opacity=".22" stroke="#7c3aed" stroke-width="3"/>
+  <g fill="none" stroke="#f97316" stroke-width="5" stroke-linecap="round">
+    <path d="M101 433 C138 380 162 424 193 330 C223 251 254 339 306 403"/>
+    <path d="M496 433 C533 380 557 424 588 330 C618 251 649 339 701 403"/>
+    <path d="M891 433 C928 380 952 424 983 330 C1013 251 1044 339 1096 403"/>
+  </g>
+  <g stroke="#7c3aed" stroke-width="4" marker-end="url(#arrowPurple)">
+    <path d="M55 345 L168 345"/><path d="M355 345 L240 345"/>
+    <path d="M600 185 L600 303"/><path d="M600 515 L600 386"/>
+    <path d="M845 345 L960 345"/><path d="M1145 345 L1034 345"/>
+  </g>
+  <g font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#6d28d9">
+    <text x="63" y="329">+X 方向</text><text x="274" y="329">−X 方向</text>
+    <text x="615" y="200">+Y 方向</text><text x="615" y="507">−Y 方向</text>
+    <text x="850" y="329">+Z 方向</text><text x="1065" y="329">−Z 方向</text>
+  </g>
+  <text x="205" y="502" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#475569">SlabAxis = X</text>
+  <text x="600" y="502" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#475569">SlabAxis = Y</text>
+  <text x="995" y="502" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#475569">SlabAxis = Z</text>
+  <rect x="82" y="536" width="22" height="16" fill="#8b5cf6" fill-opacity=".25" stroke="#7c3aed"/><text x="115" y="550" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#334155">当前薄层：SlabMin ≤ AxisValue ≤ SlabMax</text>
+  <line x1="477" y1="544" x2="501" y2="544" stroke="#7c3aed" stroke-width="4" marker-end="url(#arrowPurple)"/><text x="512" y="550" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#334155">双向正交采集可降低单侧遮挡</text>
+  <text x="859" y="550" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="600" fill="#b45309">三个轴依次执行，并非同时裁切</text>
+  <rect x="58" y="640" width="1084" height="44" rx="10" fill="#f5f3ff"/>
+  <text x="80" y="668" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#5b21b6">输出：各轴、各薄层、各方向的正交视图统一融合，用更高任务量换取更少的深层遮挡缺失。</text>
+</svg>

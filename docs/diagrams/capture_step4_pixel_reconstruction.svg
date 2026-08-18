@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120">
+  <defs>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="blueCard" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#eff6ff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+    <linearGradient id="purpleCard" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#faf5ff"/>
+      <stop offset="1" stop-color="#ede9fe"/>
+    </linearGradient>
+    <linearGradient id="orangeCard" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#ffedd5"/>
+    </linearGradient>
+    <linearGradient id="greenCard" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ecfdf5"/>
+      <stop offset="1" stop-color="#d1fae5"/>
+    </linearGradient>
+    <pattern id="pixelGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#cbd5e1" stroke-width="1"/>
+    </pattern>
+    <pattern id="voxelGrid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#94a3b8" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".10"/>
+    </filter>
+    <marker id="arrowSlate" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0 0L9 3L0 6Z" fill="#475569"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0 0L9 3L0 6Z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0 0L9 3L0 6Z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0 0L9 3L0 6Z" fill="#ea580c"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0 0L9 3L0 6Z" fill="#059669"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1120" rx="28" fill="url(#pageBg)"/>
+  <text x="56" y="62" font-family="Microsoft YaHei, sans-serif" font-size="32" font-weight="700" fill="#0f172a">第 4 步 · 像素重建与体素坐标转换</text>
+  <text x="56" y="98" font-family="Microsoft YaHei, sans-serif" font-size="18" fill="#475569">DepthPixels + ColorPixels → 世界空间表面点 → 邻域置信度 → 体素量化 → LinearIndex</text>
+
+  <g filter="url(#shadow)">
+    <rect x="56" y="130" width="1488" height="190" rx="20" fill="#ffffff" stroke="#cbd5e1"/>
+  </g>
+  <circle cx="91" cy="167" r="18" fill="#0f172a"/>
+  <text x="91" y="173" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#ffffff">1</text>
+  <text x="122" y="174" font-family="Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#0f172a">读取同一像素的深度与颜色，并定位像素中心</text>
+
+  <g transform="translate(100 204)">
+    <rect width="256" height="84" rx="13" fill="url(#blueCard)" stroke="#60a5fa" stroke-width="2"/>
+    <rect x="18" y="18" width="80" height="48" rx="5" fill="url(#pixelGrid)" stroke="#2563eb"/>
+    <rect x="42" y="42" width="24" height="24" fill="#2563eb"/>
+    <text x="118" y="34" font-family="Consolas, monospace" font-size="15" font-weight="700" fill="#1d4ed8">DepthPixels[x,y].R</text>
+    <text x="118" y="58" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#475569">沿 Forward 的 SceneDepth</text>
+  </g>
+  <path d="M376 246H444" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(464 204)">
+    <rect width="256" height="84" rx="13" fill="url(#orangeCard)" stroke="#fb923c" stroke-width="2"/>
+    <g transform="translate(18 18)">
+      <rect width="24" height="24" fill="#65a30d"/><rect x="28" width="24" height="24" fill="#a16207"/><rect x="56" width="24" height="24" fill="#84cc16"/>
+      <rect y="28" width="24" height="20" fill="#166534"/><rect x="28" y="28" width="24" height="20" fill="#d97706"/><rect x="56" y="28" width="24" height="20" fill="#4d7c0f"/>
+    </g>
+    <text x="118" y="34" font-family="Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c">ColorPixels[x,y]</text>
+    <text x="118" y="58" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#475569">同一表面的 BaseColor</text>
+  </g>
+  <path d="M740 246H808" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(828 194)">
+    <rect width="330" height="104" rx="13" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <text x="165" y="27" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#334155">像素中心 → 归一化屏幕坐标</text>
+    <text x="18" y="56" font-family="Consolas, monospace" font-size="14" fill="#334155">Nx = (x + 0.5) / R × 2 − 1</text>
+    <text x="18" y="82" font-family="Consolas, monospace" font-size="14" fill="#334155">Ny = 1 − (y + 0.5) / R × 2</text>
+  </g>
+  <path d="M1178 246H1246" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(1266 194)">
+    <rect width="232" height="104" rx="13" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <text x="116" y="26" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#334155">先过滤无效输入</text>
+    <text x="18" y="54" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#475569">有限深度 · 最小/最大范围</text>
+    <text x="18" y="78" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#475569">CaptureBounds · 当前 Slab</text>
+    <text x="18" y="96" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#dc2626">失败 → 丢弃该像素</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="56" y="346" width="1488" height="300" rx="20" fill="#ffffff" stroke="#cbd5e1"/>
+  </g>
+  <circle cx="91" cy="383" r="18" fill="#0f172a"/>
+  <text x="91" y="389" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#ffffff">2</text>
+  <text x="122" y="390" font-family="Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#0f172a">按投影类型反投影，得到同一个 WorldPosition</text>
+
+  <g transform="translate(90 424)">
+    <rect width="688" height="186" rx="16" fill="url(#blueCard)" stroke="#60a5fa" stroke-width="2"/>
+    <text x="24" y="31" font-family="Microsoft YaHei, sans-serif" font-size="19" font-weight="700" fill="#1d4ed8">透视投影 · 射线同源、方向不同</text>
+    <circle cx="92" cy="112" r="12" fill="#2563eb"/>
+    <text x="92" y="151" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#475569">CameraPosition</text>
+    <path d="M106 112L324 65" stroke="#60a5fa" stroke-width="2" stroke-dasharray="7 6"/>
+    <path d="M106 112L334 112" stroke="#2563eb" stroke-width="4" marker-end="url(#arrowBlue)"/>
+    <path d="M106 112L324 160" stroke="#60a5fa" stroke-width="2" stroke-dasharray="7 6"/>
+    <path d="M106 112L274 76" stroke="#2563eb" stroke-width="4" marker-end="url(#arrowBlue)"/>
+    <circle cx="274" cy="76" r="8" fill="#f97316" stroke="#ffffff" stroke-width="3"/>
+    <path d="M274 76V112" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="214" y="61" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#1d4ed8">RayDirection</text>
+    <text x="289" y="96" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#475569">Forward 深度投影</text>
+    <text x="374" y="66" font-family="Consolas, monospace" font-size="14" fill="#334155">Ray = normalize(F + R·Nx·tan + U·Ny·tan)</text>
+    <text x="374" y="102" font-family="Consolas, monospace" font-size="14" fill="#334155">Distance = Depth / dot(Ray, Forward)</text>
+    <text x="374" y="138" font-family="Consolas, monospace" font-size="14" font-weight="700" fill="#1d4ed8">P = Camera + Ray × Distance</text>
+    <text x="374" y="164" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#475569">虚线表示视锥边界与被表面截断的投影辅助线</text>
+  </g>
+
+  <g transform="translate(822 424)">
+    <rect width="688" height="186" rx="16" fill="url(#purpleCard)" stroke="#a78bfa" stroke-width="2"/>
+    <text x="24" y="31" font-family="Microsoft YaHei, sans-serif" font-size="19" font-weight="700" fill="#6d28d9">正交投影 · 方向相同、起点不同</text>
+    <path d="M62 62V164M104 62V164M146 62V164M188 62V164M230 62V164" stroke="#c4b5fd" stroke-width="2" stroke-dasharray="6 5"/>
+    <path d="M62 139H280M104 112H280M146 84H280" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowPurple)"/>
+    <path d="M280 54C254 74 283 90 256 106C230 121 267 137 236 160" fill="none" stroke="#f97316" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="256" cy="106" r="8" fill="#f97316" stroke="#ffffff" stroke-width="3"/>
+    <text x="87" y="178" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#475569">相机平面</text>
+    <text x="340" y="69" font-family="Consolas, monospace" font-size="14" fill="#334155">PlanePoint = Camera</text>
+    <text x="340" y="94" font-family="Consolas, monospace" font-size="14" fill="#334155">+ Right × Nx × Width/2</text>
+    <text x="340" y="119" font-family="Consolas, monospace" font-size="14" fill="#334155">+ Up × Ny × Width/2</text>
+    <text x="340" y="153" font-family="Consolas, monospace" font-size="14" font-weight="700" fill="#6d28d9">P = PlanePoint + Forward × Depth</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="56" y="672" width="1488" height="202" rx="20" fill="#ffffff" stroke="#cbd5e1"/>
+  </g>
+  <circle cx="91" cy="709" r="18" fill="#0f172a"/>
+  <text x="91" y="715" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#ffffff">3</text>
+  <text x="122" y="716" font-family="Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#0f172a">用水平、垂直邻居估计法线和样本置信度</text>
+
+  <g transform="translate(104 746)">
+    <rect x="0" y="0" width="226" height="96" rx="13" fill="url(#pixelGrid)" stroke="#94a3b8" stroke-width="2"/>
+    <rect x="96" y="36" width="24" height="24" fill="#f97316"/>
+    <rect x="120" y="36" width="24" height="24" fill="#2563eb"/>
+    <rect x="96" y="60" width="24" height="24" fill="#7c3aed"/>
+    <path d="M108 48H131" stroke="#1d4ed8" stroke-width="3" marker-end="url(#arrowBlue)"/>
+    <path d="M108 48V71" stroke="#6d28d9" stroke-width="3" marker-end="url(#arrowPurple)"/>
+    <text x="174" y="29" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#334155">中心 P</text>
+    <text x="174" y="53" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#1d4ed8">水平 H</text>
+    <text x="174" y="77" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#6d28d9">垂直 V</text>
+  </g>
+  <path d="M350 794H414" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(434 744)">
+    <rect width="330" height="102" rx="13" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <text x="165" y="25" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#334155">深度连续才计算邻域法线</text>
+    <text x="18" y="52" font-family="Consolas, monospace" font-size="13" fill="#334155">Threshold = DiscontinuityVoxels × VoxelSize</text>
+    <text x="18" y="78" font-family="Consolas, monospace" font-size="13" fill="#334155">N = normalize(cross(H − P, V − P))</text>
+    <text x="18" y="96" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#475569">邻居无效时回退左侧/上侧；仍失败则基础置信度 0.25</text>
+  </g>
+  <path d="M784 794H848" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(868 744)">
+    <rect width="386" height="102" rx="13" fill="url(#orangeCard)" stroke="#fb923c" stroke-width="2"/>
+    <text x="193" y="25" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#c2410c">朝向权重 × 边缘惩罚</text>
+    <text x="18" y="52" font-family="Consolas, monospace" font-size="13" fill="#334155">Facing = abs(dot(N, −ViewDirection))</text>
+    <text x="18" y="77" font-family="Consolas, monospace" font-size="13" fill="#334155">Confidence = Facing × clamp(EdgePenalty)</text>
+    <text x="18" y="96" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#475569">正视连续表面趋近 1；掠射角和深度断层趋近 0</text>
+  </g>
+  <path d="M1274 794H1328" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(1348 744)">
+    <rect width="154" height="102" rx="13" fill="url(#greenCard)" stroke="#34d399" stroke-width="2"/>
+    <text x="77" y="28" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#047857">阈值过滤</text>
+    <text x="77" y="55" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#065f46">C ≥ Minimum</text>
+    <text x="77" y="78" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#047857">保留样本</text>
+    <text x="77" y="96" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#dc2626">否则丢弃</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="56" y="900" width="1488" height="164" rx="20" fill="#ffffff" stroke="#cbd5e1"/>
+  </g>
+  <circle cx="91" cy="937" r="18" fill="#0f172a"/>
+  <text x="91" y="943" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#ffffff">4</text>
+  <text x="122" y="944" font-family="Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#0f172a">把连续世界位置量化到离散体素，并输出单视图累加键</text>
+
+  <g transform="translate(108 974)">
+    <rect width="290" height="62" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <text x="145" y="24" text-anchor="middle" font-family="Consolas, monospace" font-size="13" fill="#334155">Relative = (P − WorldOrigin) / VoxelSize</text>
+    <text x="145" y="47" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#475569">连续世界坐标 → 体素单位坐标</text>
+  </g>
+  <path d="M418 1005H472" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(492 966)">
+    <rect width="324" height="78" rx="12" fill="url(#purpleCard)" stroke="#a78bfa" stroke-width="2"/>
+    <text x="162" y="22" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#6d28d9">Floor + 世界轴到体素轴交换</text>
+    <text x="18" y="47" font-family="Consolas, monospace" font-size="13" fill="#334155">Voxel = floor(Relative.X, Relative.Z, Relative.Y)</text>
+    <text x="162" y="69" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#475569">Voxel X/Y/Z ← World X/Z/Y</text>
+  </g>
+  <path d="M836 1005H890" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(910 966)">
+    <rect width="276" height="78" rx="12" fill="url(#voxelGrid)" stroke="#2563eb" stroke-width="2"/>
+    <rect x="96" y="32" width="32" height="32" fill="#2563eb" fill-opacity=".70" stroke="#1d4ed8" stroke-width="2"/>
+    <circle cx="112" cy="48" r="5" fill="#f97316"/>
+    <text x="196" y="29" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="13" font-weight="700" fill="#1d4ed8">目标体素</text>
+    <text x="196" y="51" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#475569">橙点 → 蓝色单元</text>
+    <text x="196" y="69" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#475569">同步记录量化误差</text>
+  </g>
+  <path d="M1206 1005H1260" stroke="#475569" stroke-width="4" marker-end="url(#arrowSlate)"/>
+  <g transform="translate(1280 966)">
+    <rect width="222" height="78" rx="12" fill="url(#greenCard)" stroke="#34d399" stroke-width="2"/>
+    <text x="111" y="22" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#047857">单视图累加输出</text>
+    <text x="111" y="45" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#065f46">LinearIndex + Color</text>
+    <text x="111" y="65" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#065f46">+ Confidence</text>
+  </g>
+
+  <text x="76" y="1096" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#475569">颜色语义：蓝色＝深度/透视射线　紫色＝正交/轴映射　橙色＝场景表面与置信度　绿色＝通过过滤并写入体素累加器</text>
+</svg>
